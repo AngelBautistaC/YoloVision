@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 import cvzone
+import math
 
 # Configuración de la fuente de video
 use_ip_camera = False
@@ -38,6 +39,10 @@ pixels_per_meter_buffer_far = []
 detection_active = True
 calibration_stage = 0  # 0: sin empezar, 1: cerca, 2: lejos, 3: completado
 current_polygon = None
+expanded_polygon = None
+
+personas_por_perimetro = 1.15
+distancia_persona = 0.3  # 30 cm
 
 dragging = False
 current_point = None
@@ -50,6 +55,30 @@ def simplify_polygon(polygon, target_points=12):
         epsilon += 0.01
         polygon = cv2.approxPolyDP(polygon, epsilon * cv2.arcLength(polygon, True), True)
     return polygon.squeeze()
+
+def expand_polygon(polygon, distance):
+    # Convertir a numpy array
+    poly_np = np.array(polygon, dtype=np.float32)
+    
+    # Calcular el centro del polígono
+    M = cv2.moments(poly_np)
+    cx = int(M['m10'] / M['m00'])
+    cy = int(M['m01'] / M['m00'])
+    center = np.array([cx, cy])
+    
+    # Expandir cada punto
+    expanded = []
+    for point in poly_np:
+        # Calcular el vector desde el centro al punto
+        vector = point - center
+        # Normalizar el vector
+        vector_norm = vector / np.linalg.norm(vector)
+        # Expandir el punto
+        expanded_point = point + vector_norm * distance * pixels_per_meter
+        expanded.append(expanded_point)
+    
+    return expanded
+
 
 def mouse_callback(event, x, y, flags, param):
     global dragging, current_point, moving_box, last_pos, current_polygon
@@ -85,18 +114,20 @@ def mouse_callback(event, x, y, flags, param):
         last_pos = None
 
 def reset_all():
-    global pixels_per_meter, captured_image, detections, pixels_per_meter_buffer, detection_active, calibration_ready, current_polygon, aruco_calibration_done
+    global pixels_per_meter, captured_image, detections, pixels_per_meter_buffer_near, pixels_per_meter_buffer_far, detection_active, calibration_stage, current_polygon
     pixels_per_meter = None
     captured_image = None
     detections = []
-    pixels_per_meter_buffer = []
+    pixels_per_meter_buffer_near = []
+    pixels_per_meter_buffer_far = []
     detection_active = True
-    calibration_ready = False
+    calibration_stage = 0
     current_polygon = None
-    aruco_calibration_done = False
+
 
 cv2.namedWindow("Table Detection and Measurement")
 cv2.setMouseCallback("Table Detection and Measurement", mouse_callback)
+
 
 while True:
     ret, frame = cap.read()
@@ -165,11 +196,18 @@ while True:
                 area_pixels = cv2.contourArea(np.array(current_polygon))
                 area_meters = area_pixels / (pixels_per_meter ** 2)
                 
-                info_text = f"Area: {area_meters:.2f} m²"
+                perimeter_pixels = cv2.arcLength(np.array(current_polygon), True)
+                perimeter_meters = perimeter_pixels / pixels_per_meter
+                
+                personas = math.floor(perimeter_meters / personas_por_perimetro)
+                
+                expanded_polygon = expand_polygon(current_polygon, distancia_persona)
+                cv2.polylines(display_image, [np.array(expanded_polygon, dtype=np.int32)], True, (255, 0, 0), 2)
+                
+                info_text = f"Area: {area_meters:.2f} m^2 | Perimetro: {perimeter_meters:.2f} m | Personas: {personas}"
                 cv2.putText(display_image, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             
             cv2.imshow("Table Detection and Measurement", display_image)
-
 
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
