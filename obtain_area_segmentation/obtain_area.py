@@ -49,12 +49,42 @@ current_point = None
 moving_box = None
 last_pos = None
 
-def simplify_polygon(polygon, target_points=12):
-    epsilon = 0.02
-    while len(polygon) > target_points:
-        epsilon += 0.01
-        polygon = cv2.approxPolyDP(polygon, epsilon * cv2.arcLength(polygon, True), True)
-    return polygon.squeeze()
+def simplify_polygon(polygon, target_points=6):
+    """Simplifica un polígono a un número objetivo de puntos utilizando el algoritmo RDP.
+
+    Args:
+        polygon: El polígono a simplificar.
+        target_points: El número deseado de puntos en el polígono simplificado.
+
+    Returns:
+        Un polígono simplificado con el número objetivo de puntos.
+    """
+    epsilon = 0.01 * cv2.arcLength(polygon, True)
+    approx = cv2.approxPolyDP(polygon, epsilon, True)
+    while len(approx) > target_points:
+        epsilon *= 1.1  # Incrementa epsilon gradualmente
+        approx = cv2.approxPolyDP(polygon, epsilon, True)
+    # Asegurarse de que siempre haya 6 puntos
+    if len(approx) < target_points:
+        # Interpolar puntos si es necesario
+        approx = np.array(approx).squeeze()
+        perimeter = cv2.arcLength(approx, True)
+        target_distance = perimeter / target_points
+        new_points = []
+        for i in range(len(approx)):
+            p1 = approx[i]
+            p2 = approx[(i + 1) % len(approx)]
+            distance = np.linalg.norm(p1 - p2)
+            if distance > target_distance:
+                num_new_points = int(distance / target_distance)
+                for j in range(num_new_points):
+                    t = (j + 1) / (num_new_points + 1)
+                    new_point = (1 - t) * p1 + t * p2
+                    new_points.append(new_point)
+            new_points.append(p1)
+        approx = np.array(new_points)
+    return approx.squeeze()
+
 
 def expand_polygon(polygon, distance):
     # Convertir a numpy array
@@ -135,6 +165,7 @@ while True:
         print("Error al capturar el frame.")
         break
 
+####
     if detection_active:
         if calibration_stage < 3:
             corners, ids, rejected = detector.detectMarkers(frame)
