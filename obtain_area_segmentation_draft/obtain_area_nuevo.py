@@ -27,7 +27,7 @@ dist_coeffs = np.array([0, 0, 0, 0, 0], dtype=np.float32)
 marker_size = 0.15  # 15 cm
 
 # Cargar el modelo YOLOv8 de segmentación
-model = YOLO('yolov8x-seg.pt')
+model = YOLO('yolov8m-seg.pt')
 
 cap = cv2.VideoCapture(video_source)
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -44,6 +44,8 @@ calibration_stage = 0  # 0: sin empezar, 1: cerca, 2: lejos, 3: completado
 current_polygon = None
 expanded_polygon = None
 tracking_active = False
+detection_paused = False  # Nueva variable
+
 
 personas_por_perimetro = 1.15 # Cuantas personas entran en un segmento de X metros? 1 persona por cada 1.15 metros
 distancia_persona = 0.3  # Cuanto es el margen desde la mesa a la personas para ser detectadas? 30 cm
@@ -130,8 +132,9 @@ def mouse_callback(event, x, y, flags, param):
         current_point = None
         last_pos = None
 
+
 def reset_all():
-    global pixels_per_meter, captured_image, detections, pixels_per_meter_buffer_near, pixels_per_meter_buffer_far, detection_active, calibration_stage, current_polygon
+    global pixels_per_meter, captured_image, detections, pixels_per_meter_buffer_near, pixels_per_meter_buffer_far, detection_active, calibration_stage, current_polygon, detection_paused
     pixels_per_meter = None
     captured_image = None
     detections = []
@@ -140,6 +143,8 @@ def reset_all():
     detection_active = True
     calibration_stage = 0
     current_polygon = None
+    detection_paused = False  # Reiniciar también esta variable
+
 
 cv2.namedWindow("Table Detection and Measurement")
 cv2.setMouseCallback("Table Detection and Measurement", mouse_callback)
@@ -176,30 +181,42 @@ while True:
                     cv2.putText(frame, "Presione 'p' para calcular pixels por metro", (10, height - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
         if pixels_per_meter is not None:
-            results = model(frame, classes=[60])  # Asumiendo que 60 es la clase para mesas
-            detections = []
+            if not detection_paused:
+                results = model(frame, classes=[60], conf=0.1)
+                detections = []
 
-            for result in results:
-                masks = result.masks
-                if masks is not None:
-                    for i, mask in enumerate(masks):
-                        mask_array = mask.xy[0].astype(int)
-                        polygon = cv2.convexHull(mask_array)
-                        simplified_polygon = simplify_polygon(polygon)
-                        detections.append({
-                            'points': simplified_polygon.tolist(),
-                            'label': f"Tabla {i+1}"
-                        })
-                        cv2.polylines(frame, [simplified_polygon], isClosed=True, color=(0, 255, 0), thickness=2)
-                        M = cv2.moments(simplified_polygon)
-                        if M["m00"] != 0:
-                            cX = int(M["m10"] / M["m00"])
-                            cY = int(M["m01"] / M["m00"])
-                            cv2.putText(frame, f"Tabla {i+1}", (cX, cY), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                for result in results:
+                    masks = result.masks
+                    if masks is not None:
+                        for i, mask in enumerate(masks):
+                            mask_array = mask.xy[0].astype(int)
+                            polygon = cv2.convexHull(mask_array)
+                            simplified_polygon = simplify_polygon(polygon)
+                            if len(simplified_polygon) > 2:
+                                detections.append({
+                                    'points': simplified_polygon.tolist(),
+                                    'label': f"Tabla {i+1}"
+                                })
+                                cv2.polylines(frame, [simplified_polygon], isClosed=True, color=(0, 255, 0), thickness=2)
+                                M = cv2.moments(simplified_polygon)
+                                if M["m00"] != 0:
+                                    cX = int(M["m10"] / M["m00"])
+                                    cY = int(M["m01"] / M["m00"])
+                                    cv2.putText(frame, f"Tabla {i+1}", (cX, cY), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                        
+                        if detections:
+                            detection_paused = True
 
-            cv2.putText(frame, "Presione 'r' para capturar la mesa", (10, height - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-        
-        cv2.imshow("Table Detection and Measurement", frame)
+            if detection_paused:
+                cv2.putText(frame, "Presione 'u' para usar este poligono o 'c' para continuar buscando", (10, height - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                for detection in detections:
+                    cv2.polylines(frame, [np.array(detection['points'], dtype=np.int32)], isClosed=True, color=(0, 255, 0), thickness=2)
+            else:
+                cv2.putText(frame, "Buscando mesa...", (10, height - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+
+        cv2.imshow("Table Detection and Measurement", frame)  
+        #cv2.imshow("Table Detection and Measurement", frame)
 
     elif not tracking_active:
         if captured_image is not None:
@@ -258,18 +275,24 @@ while True:
         calibration_stage = 3
     elif key == ord('r') and pixels_per_meter is not None and detections:
         captured_image = frame.copy()
-        current_polygon = detections[0]['points']  # Tomamos la primera detección
+        current_polygon = detections[0]['points']
         detection_active = False
     elif key == ord('t') and not tracking_active and current_polygon is not None:
         tracking_active = True
-        # Inicializar el tracking y las regiones de conteo
         track_history = tracker.initialize_tracking()
         counting_regions = tracker.initialize_counting_regions(expanded_polygon, personas)
-        # Cargar el modelo YOLO para el tracking de personas
         model = YOLO('yolov8s-seg.pt')
-    elif key == ord('n'):  # Nueva tecla para reiniciar todo el flujo
+    elif key == ord('n'):
         reset_all()
         tracking_active = False
+    elif key == ord('u') and detection_paused:
+        # Usar el polígono actual
+        current_polygon = detections[0]['points']
+        detection_active = False
+    elif key == ord('c') and detection_paused:
+        # Continuar buscando
+        detection_paused = False
+        detections = []
 
 # Cerrar la captura de video y las ventanas
 cap.release()
