@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+{% load static %}
+{% load bootstrap5 %}
+{% bootstrap_css %}
+{% bootstrap_javascript %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" type="image/png" href="{% static 'images/favicon.png' %}"/>
+    <title>VisionPUCP</title>
+    
+    <style>
+        @font-face {
+            font-family: 'TT_Bold';
+            src: url('{% static "fonts/TT_Bold.otf" %}');
+            font-weight: normal;
+            font-style: normal;
+        }
+        body { 
+            overflow-x: hidden;
+            background-color: #E9E9E9;
+        }
+        #wrapper {
+            display: flex;
+            width: 100%;
+            align-items: stretch;
+        }
+        #sidebar-wrapper {
+            min-height: 100vh;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+            transition: all 0.3s;
+            background-color: #042354;
+        }
+        #sidebar-wrapper .sidebar-heading { 
+            height: 110px;
+            padding: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sidebar-heading img {
+            height: 90px;
+            width: auto;
+        }
+        #close-sidebar {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 10px;
+        }
+        #page-content-wrapper {
+            width: 100%;
+            min-height: 100vh;
+            transition: all 0.3s;
+        }
+        .sidebar-nav { 
+            padding-left: 0; 
+            list-style: none; 
+        }
+        .sidebar-nav li { 
+            padding: 10px 15px; 
+        }
+        .sidebar-nav li a { 
+            text-decoration: none; 
+            color: #cdcdcd; 
+        }
+        .sidebar-nav li.active { 
+            background-color: rgba(255,255,255,0.1); 
+        }
+        .sidebar-nav li.active a { 
+            color: white; 
+        }
+        .navbar {
+            background-color: white !important;
+        }
+        .navbar-brand {
+            font-family: 'TT_Bold';
+            color: black !important;
+        }
+        @media (max-width: 768px) {
+            #sidebar-wrapper {
+                margin-left: -250px;
+            }
+            #sidebar-wrapper.active {
+                margin-left: 0;
+            }
+            #page-content-wrapper {
+                margin-left: 0;
+            }
+        }
+        @media (min-width: 769px) {
+            #sidebar-wrapper {
+                margin-left: 0;
+            }
+            #page-content-wrapper {
+                margin-left: 250px;
+            }
+            #wrapper.toggled #sidebar-wrapper {
+                margin-left: -250px;
+            }
+            #wrapper.toggled #page-content-wrapper {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="d-flex" id="wrapper">
+        <!-- Sidebar -->
+        <div id="sidebar-wrapper">
+            <div class="sidebar-heading">
+                <img src="{% static 'images/cabeceraPUCP.png' %}" alt="PUCP Logo">
+                <button id="close-sidebar">&times;</button>
+            </div>
+            <ul class="sidebar-nav">
+                <li class="active"><a href="#"><i class="fas fa-home"></i> Monitoreo</a></li>
+                <li><a href="#"><i class="fas fa-chart-bar"></i> Configuración</a></li>
+                <li><a href="#"><i class="fas fa-shopping-cart"></i> Ayuda</a></li>
+                <li><a href="/"><i class="fas fa-project-diagram"></i> Salir</a></li>
+            </ul>
+        </div>
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+                <div class="container-fluid">
+                    <button class="btn" id="menu-toggle">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <a class="navbar-brand" href="#">{% block page_title %}Monitoreo{% endblock %}</a>
+                    <form class="d-flex ms-auto">
+
+                    </form>
+                </div>
+            </nav>
+            <div class="container-fluid">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            document.getElementById("wrapper").classList.toggle("toggled");
+            document.getElementById("sidebar-wrapper").classList.toggle("active");
+        }
+
+        document.getElementById("menu-toggle").addEventListener("click", function(e) {
+            e.preventDefault();
+            toggleSidebar();
+        });
+
+        document.getElementById("close-sidebar").addEventListener("click", function(e) {
+            e.preventDefault();
+            toggleSidebar();
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

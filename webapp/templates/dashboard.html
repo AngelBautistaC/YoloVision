@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Monitoreo{% endblock %}
+{% block content %}
+<h1 class="mt-4">Dashboard</h1>
+<div class="row mt-4">
+    <div class="col-md-6 col-lg-3 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Customers</h5>
+                <h2 class="card-text">36,254</h2>
+                <p class="card-text text-success">↑ 5.27% Since last month</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Revenue</h5>
+                <h2 class="card-text">$6,254</h2>
+                <p class="card-text text-danger">↓ 7.00% Since last month</p>
+            </div>
+        </div>
+    </div>
+    <!-- Add more cards for other metrics -->
+</div>
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">PROJECTIONS VS ACTUALS</h5>
+                <!-- Add your chart here -->
+                <p>Chart placeholder</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
