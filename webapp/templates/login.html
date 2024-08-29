@@ -1,31 +1,115 @@
+{% load static %}
 {% load bootstrap5 %}
 {% bootstrap_css %}
 {% bootstrap_javascript %}
 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" type="image/png" href="{% static 'images/favicon.png' %}"/>
+    <title>VisionPUCP - Logueo</title>
+    <style>
+        @font-face {
+            font-family: 'TT_Regular';
+            src: url('{% static "fonts/TT_Regular.otf" %}');
+            font-weight: normal;
+            font-style: normal;
+        }
 
+        body, html {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'TT_Regular', sans-serif;
+        }
+        .background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("{% static 'images/diciembre.jpg' %}");
+            background-size: cover;
+            background-position: center;
+            filter: blur(8px);
+            z-index: -1;
+        }
+        .container {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card {
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 450px;
+        }
+        .card-header {
+            background-color: #042354;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+        }
+        .card-body {
+            padding: 30px;
+        }
+        .btn-primary {
+            background-color: #042354;
+            border-color: #042354;
+        }
+        .btn-primary:hover {
+            background-color: #031c43;
+            border-color: #031c43;
+        }
+        .logo {
+            width: 145px;
+            height: 48px;
+            margin-bottom: 20px;
+            object-fit: contain;
+            scale: 2;
+        }
+    </style>
+</head>
+<body>
+<div class="background"></div>
 
-{% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">Login</div>
-                <div class="card-body">
-                    <form method="post">
-                        {% csrf_token %}
-                        <div class="mb-3">
-                            <label for="username" class="form-label">Username</label>
-                            <input type="text" class="form-control" id="username" name="username">
-                        </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="password" name="password">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Login</button>
-                    </form>
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <img src="{% static 'images/cabeceraPUCP.png' %}" alt="PUCP Logo" class="logo">
+            <h4>Sistema de Computer Vision PUCP</h4>
+            <p>Administración del Sistema</p>
+        </div>
+        <div class="card-body">
+            <button class="btn btn-primary w-100 mb-4">
+                <img src="https://www.google.com/favicon.ico" alt="Google" width="20" height="20" class="me-2">
+                Iniciar Sesión Con Gmail PUCP
+            </button>
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="username" class="form-label">Usuario</label>
+                    <input type="text" class="form-control" id="username" name="username">
                 </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Contraseña</label>
+                    <input type="password" class="form-control" id="password" name="password">
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Iniciar Sesión</button>
+            </form>
+            <div class="text-center mt-3">
+                <a href="#" class="text-muted">Contraseña olvidada</a>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
+
+</body>
+</html>

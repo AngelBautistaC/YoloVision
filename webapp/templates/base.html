@@ -79,23 +79,51 @@
             color: white; 
         }
         .navbar {
-            background-color: white !important;
-        }
-        .navbar-brand {
-            font-family: 'TT_Bold';
-            color: black !important;
-        }
-        @media (max-width: 768px) {
-            #sidebar-wrapper {
-                margin-left: -250px;
-            }
-            #sidebar-wrapper.active {
-                margin-left: 0;
-            }
-            #page-content-wrapper {
-                margin-left: 0;
-            }
-        }
+    background-color: white !important;
+    height: 70px;
+    padding: 0 1rem;
+}
+.navbar-brand {
+    font-family: 'TT_Bold';
+    color: black !important;
+    font-size: 1.5rem !important;
+    line-height: 70px; /* Alinea verticalmente con la altura del navbar */
+}
+#menu-toggle {
+    font-size: 1.25rem;
+    padding: 0.5rem 0.75rem;
+    display: flex;
+    align-items: center;
+    height: 70px; /* Iguala la altura del navbar */
+}
+#menu-toggle .navbar-toggler-icon {
+    height: 1.5em;
+    width: 1.5em;
+}
+
+@media (max-width: 768px) {
+
+    #sidebar-wrapper {
+        margin-left: -250px;
+    }
+    #sidebar-wrapper.active {
+        margin-left: 0;
+    }
+    #page-content-wrapper {
+        margin-left: 0;
+    }
+    .navbar-brand {
+        font-size: 1.25rem !important;
+    }
+    #menu-toggle {
+        font-size: 1rem;
+        padding: 0.4rem 0.6rem;
+    }
+    #menu-toggle .navbar-toggler-icon {
+        height: 1.25em;
+        width: 1.25em;
+    }
+}
         @media (min-width: 769px) {
             #sidebar-wrapper {
                 margin-left: 0;
@@ -124,20 +152,22 @@
                 <li class="active"><a href="#"><i class="fas fa-home"></i> Monitoreo</a></li>
                 <li><a href="#"><i class="fas fa-chart-bar"></i> Configuración</a></li>
                 <li><a href="#"><i class="fas fa-shopping-cart"></i> Ayuda</a></li>
-                <li><a href="/"><i class="fas fa-project-diagram"></i> Salir</a></li>
+                <li><a href="/logout"><i class="fas fa-project-diagram"></i> Salir</a></li>
             </ul>
         </div>
         <!-- Page Content -->
         <div id="page-content-wrapper">
             <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
                 <div class="container-fluid">
-                    <button class="btn" id="menu-toggle">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
-                    <a class="navbar-brand" href="#">{% block page_title %}Monitoreo{% endblock %}</a>
-                    <form class="d-flex ms-auto">
-
-                    </form>
+                    <div class="d-flex align-items-center">
+                        <button class="btn" id="menu-toggle">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        <a class="navbar-brand mb-0 ms-3" href="#">{% block page_title %}Monitoreo{% endblock %}</a>
+                    </div>
+                    <div class="ms-auto me-3">
+                        <!-- If needed, info on the right side corner of the navbar. -->
+                    </div>
                 </div>
             </nav>
             <div class="container-fluid">
@@ -151,16 +181,40 @@
             document.getElementById("wrapper").classList.toggle("toggled");
             document.getElementById("sidebar-wrapper").classList.toggle("active");
         }
-
+    
         document.getElementById("menu-toggle").addEventListener("click", function(e) {
             e.preventDefault();
             toggleSidebar();
         });
-
+    
         document.getElementById("close-sidebar").addEventListener("click", function(e) {
             e.preventDefault();
             toggleSidebar();
         });
+        function handleOutsideClick(event) {
+    var sidebar = document.getElementById('sidebar-wrapper');
+    var toggleBtn = document.getElementById('menu-toggle');
+    var wrapper = document.getElementById("wrapper");
+    var isClickInside = sidebar.contains(event.target) || toggleBtn.contains(event.target);
+
+    if (!isClickInside) {
+        if (window.innerWidth <= 768) {
+            // Lógica para dispositivos móviles
+            if (sidebar.classList.contains('active')) {
+                toggleSidebar();
+            }
+        } else {
+            // Lógica para dispositivos de escritorio
+            if (!wrapper.classList.contains("toggled")) {
+                toggleSidebar();
+            }
+        }
+    }
+}
+
+// Agregar event listeners para click y touch
+document.addEventListener('click', handleOutsideClick);
+document.addEventListener('touchstart', handleOutsideClick);
     </script>
     {% block extra_js %}{% endblock %}
 </body>
