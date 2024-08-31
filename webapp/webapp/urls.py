@@ -16,11 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from main.views import login_view, monitoring_view
+from main.views import login_view, monitoring_view,configuracion_view, calibrar_camara,camera_stream
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', login_view, name='login'),
     path('monitoreo/', monitoring_view, name='monitoreo'),
+    path('configuracion/', configuracion_view, name='configuracion'),
     path('logout/', login_view, name='logout'),
+    path('configuracion/calibrar/',calibrar_camara, name='calibrar_camara'),
+    path('camera_stream/', camera_stream, name='camera_stream'),
 ]

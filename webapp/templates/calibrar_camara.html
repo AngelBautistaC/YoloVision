@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block page_title %}Configuración{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Calibración de Cámara</h2>
+
+
+    {% if step == '1' %}
+    <h3>Paso 1: Reconocimiento de cámara</h3>
+    <div class="row">
+        <div class="col-md-6">
+            <form method="post" id="camera-form">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="ip_port" class="form-label">IP:Puerto del stream de la cámara</label>
+                    <input type="text" class="form-control" id="ip_port" name="ip_port" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Conectar</button>
+            </form>
+
+            <div id="stream-container" class="mt-3" style="display: none;">
+                <!-- El stream se insertará aquí -->
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <form id="camera-info-form" style="display: none;">
+                <div class="mb-3">
+                    <label for="camera_name" class="form-label">Nombre de la cámara</label>
+                    <input type="text" class="form-control" id="camera_name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="ambiente" class="form-label">Ambiente</label>
+                    <select class="form-select" id="ambiente" required>
+                        <option value="">Seleccione un ambiente</option>
+                        <option value="V306">V306</option>
+                        <option value="V307">V307</option>
+                    </select>
+                </div>
+                <button type="button" id="continue-btn" class="btn btn-primary" disabled>Continuar</button>
+            </form>
+        </div>
+    </div>
+
+
+    {% elif step == '2' %}
+    <h3>Paso 2: Obtención de matriz de distorsión</h3>
+    <!-- Contenido del paso 2 -->
+    <a href="?step=1" class="btn btn-secondary">Atrás</a>
+    <a href="?step=3" class="btn btn-primary">Siguiente</a>
+
+    {% elif step == '3' %}
+    <h3>Paso 3: Obtención de medidas</h3>
+    <!-- Contenido del paso 3 -->
+    <a href="?step=2" class="btn btn-secondary">Atrás</a>
+    <a href="#" class="btn btn-success">Finalizar</a>
+
+    {% endif %}
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const cameraForm = document.getElementById('camera-form');
+        const cameraInfoForm = document.getElementById('camera-info-form');
+        const continueBtn = document.getElementById('continue-btn');
+        const streamContainer = document.getElementById('stream-container');
+    
+        if (cameraForm) {
+            cameraForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                
+                fetch('{% url "calibrar_camara" %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('Conexión exitosa:', data.message);
+                        if (streamContainer) {
+                            streamContainer.innerHTML = `<img id="stream" src="{% url 'camera_stream' %}?ip_port=${formData.get('ip_port')}" alt="Camera Stream">`;
+                            streamContainer.style.display = 'block';
+                        } else {
+                            console.error('El elemento stream-container no existe en el DOM');
+                            alert('Error: No se pudo mostrar el stream de la cámara');
+                        }
+                        if (cameraInfoForm) {
+                            cameraInfoForm.style.display = 'block';
+                        } else {
+                            console.error('El elemento camera-info-form no existe en el DOM');
+                        }
+                    } else {
+                        console.error('Error en la conexión:', data.message);
+                        alert(`Error: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error en la solicitud:', error);
+                    alert('Ocurrió un error al intentar conectar con la cámara');
+                });
+            });
+        } else {
+            console.error('El formulario de la cámara no existe en el DOM');
+        }
+    
+        if (cameraInfoForm) {
+            const inputs = cameraInfoForm.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                input.addEventListener('input', checkForm);
+            });
+        }
+    
+        function checkForm() {
+            if (cameraInfoForm && continueBtn) {
+                const allFilled = Array.from(cameraInfoForm.querySelectorAll('input, select'))
+                    .every(input => input.value.trim() !== '');
+                continueBtn.disabled = !allFilled;
+            }
+        }
+    
+        if (continueBtn) {
+            continueBtn.addEventListener('click', function() {
+                window.location.href = '?step=2';
+            });
+        }
+    });
+    </script>
+
+
+{% endblock %}

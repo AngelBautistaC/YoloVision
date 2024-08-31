@@ -1,38 +1,98 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block page_title %}Configuración{% endblock %}
+
 {% block content %}
-<h1 class="mt-4">Dashboard</h1>
-<div class="row mt-4">
-    <div class="col-md-6 col-lg-3 mb-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Customers</h5>
-                <h2 class="card-text">36,254</h2>
-                <p class="card-text text-success">↑ 5.27% Since last month</p>
+<div class="container mt-5">
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle-fill me-2"></i>
+        Para calibrar una cámara, es necesario tener su dirección IP, y las referencias de calibración:
+        <ul class="mt-2">
+            <li><a href="{% static 'pdf/opencv_chessboard.pdf' %}" target="_blank">OpenCV Chessboard</a></li>
+            <li><a href="{% static 'pdf/opencv_aruco.pdf' %}" target="_blank">OpenCV ArUco</a></li>
+        </ul>
+    </div>
+
+    <div class="row justify-content-center row-eq-height">
+        <div class="col-md-5 mb-4 d-flex">
+            <a href="{% url 'calibrar_camara' %}" class="text-decoration-none w-100">
+            <div class="card config-card w-100">
+                <div class="card-body text-center d-flex flex-column justify-content-between">
+                    <div>
+                        <i class="bi bi-gear config-icon"></i>
+                        <h5 class="card-title mt-3">Calibrar</h5>
+                    </div>
+                    <p class="card-text">Agrega y Calibra una cámara en el sistema</p>
+                </div>
+            </div>
+        </a>
+        </div>
+        <div class="col-md-5 mb-4 d-flex">
+            <div class="card config-card w-100">
+                <div class="card-body text-center d-flex flex-column justify-content-between">
+                    <div>
+                        <i class="bi bi-person-bounding-box config-icon"></i>
+                        <h5 class="card-title mt-3">Configurar</h5>
+                    </div>
+                    <p class="card-text">Configura la detección en un área utilizando una cámara ya calibrada</p>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-6 col-lg-3 mb-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Revenue</h5>
-                <h2 class="card-text">$6,254</h2>
-                <p class="card-text text-danger">↓ 7.00% Since last month</p>
-            </div>
-        </div>
-    </div>
-    <!-- Add more cards for other metrics -->
 </div>
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">PROJECTIONS VS ACTUALS</h5>
-                <!-- Add your chart here -->
-                <p>Chart placeholder</p>
-            </div>
-        </div>
-    </div>
-</div>
+
+<style>
+    .row-eq-height {
+        display: flex;
+        flex-wrap: wrap;
+    }
+    
+    .config-card {
+        transition: all 0.3s ease;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .config-card .card-body {
+        flex-grow: 1;
+    }
+
+    .config-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        background-color: #004EA8;
+        color: white;
+    }
+
+    .config-icon {
+        font-size: 3rem;
+        color: #2841DD;
+    }
+
+    .config-card:hover .config-icon {
+        color: white;
+    }
+
+    .card-title {
+        font-weight: bold;
+        color: #004EA8;
+    }
+
+    .config-card:hover .card-title {
+        color: white;
+    }
+
+    .card-text {
+        color: #666;
+    }
+
+    .config-card:hover .card-text {
+        color: #e0e0e0;
+    }
+</style>
 {% endblock %}

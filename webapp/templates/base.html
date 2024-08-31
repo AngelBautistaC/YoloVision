@@ -3,6 +3,7 @@
 {% load bootstrap5 %}
 {% bootstrap_css %}
 {% bootstrap_javascript %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -148,12 +149,20 @@
                 <img src="{% static 'images/cabeceraPUCP.png' %}" alt="PUCP Logo">
                 <button id="close-sidebar">&times;</button>
             </div>
-            <ul class="sidebar-nav">
-                <li class="active"><a href="#"><i class="fas fa-home"></i> Monitoreo</a></li>
-                <li><a href="#"><i class="fas fa-chart-bar"></i> Configuración</a></li>
-                <li><a href="#"><i class="fas fa-shopping-cart"></i> Ayuda</a></li>
-                <li><a href="/logout"><i class="fas fa-project-diagram"></i> Salir</a></li>
-            </ul>
+<ul class="sidebar-nav">
+    <li class="{% if request.path == '/monitoreo/' %}active{% endif %}">
+        <a href="/monitoreo"><i class="active"></i> Monitoreo</a>
+    </li>
+    <li class="{% if request.path == '/configuracion/' %}active{% endif %}">
+        <a href="/configuracion"><i class="active"></i> Configuración</a>
+    </li>
+    <li class="{% if request.path == '/ayuda/' %}active{% endif %}">
+        <a href="/ayuda"><i class="active"></i> Ayuda</a>
+    </li>
+    <li class="{% if request.path == '/logout/' %}active{% endif %}">
+        <a href="/logout"><i class="active"></i> Salir</a>
+    </li>
+</ul>
         </div>
         <!-- Page Content -->
         <div id="page-content-wrapper">
