@@ -5,7 +5,6 @@
 <div class="container mt-5">
     <h2>Calibración de Cámara</h2>
 
-
     {% if step == '1' %}
     <h3>Paso 1: Reconocimiento de cámara</h3>
     <div class="row">
@@ -43,23 +42,7 @@
         </div>
     </div>
 
-
-    {% elif step == '2' %}
-    <h3>Paso 2: Obtención de matriz de distorsión</h3>
-    <!-- Contenido del paso 2 -->
-    <a href="?step=1" class="btn btn-secondary">Atrás</a>
-    <a href="?step=3" class="btn btn-primary">Siguiente</a>
-
-    {% elif step == '3' %}
-    <h3>Paso 3: Obtención de medidas</h3>
-    <!-- Contenido del paso 3 -->
-    <a href="?step=2" class="btn btn-secondary">Atrás</a>
-    <a href="#" class="btn btn-success">Finalizar</a>
-
-    {% endif %}
-</div>
-
-<script>
+    <script>
     document.addEventListener('DOMContentLoaded', function() {
         const cameraForm = document.getElementById('camera-form');
         const cameraInfoForm = document.getElementById('camera-info-form');
@@ -70,14 +53,16 @@
             cameraForm.addEventListener('submit', function(e) {
                 e.preventDefault();
                 const formData = new FormData(this);
+                console.log('URL del stream a enviar:', formData.get('ip_port')); // Añade este log
+            
                 
-                fetch('{% url "calibrar_camara" %}', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    }
+                fetch('{% url "calibrar_camara_paso1" %}', {  // Cambiar esta URL
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                        }
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -125,12 +110,232 @@
         }
     
         if (continueBtn) {
-            continueBtn.addEventListener('click', function() {
-                window.location.href = '?step=2';
+        continueBtn.addEventListener('click', function() {
+            window.location.href = '{% url "calibrar_camara_paso2" %}';  // Cambiar esta URL
+        });
+    }
+});
+    </script>
+
+    {% elif step == '2' %}
+    <h3>Paso 2: Obtención de matriz de distorsión</h3>
+    <p id="capture-instructions">Capture al menos 10 imágenes antes de calibrar.</p>
+    <div class="row">
+        <div class="col-md-6">
+            <div id="stream-container">
+                <img id="stream" src="{% url 'camera_stream' %}?ip_port={{ ip_port }}" alt="Camera Stream">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <button id="capture-btn" class="btn btn-primary mb-2">Capturar imagen</button>
+            <button id="calibrate-btn" class="btn btn-success mb-2" disabled>Calibrar</button>
+            <p id="capture-count">Capturas: 0</p>
+            <div id="calibration-result" style="display: none;">
+                <h4>Resultados de la calibración:</h4>
+                <pre id="camera-matrix"></pre>
+                <pre id="dist-coeffs"></pre>
+            </div>
+        </div>
+    </div>
+    <a href="?step=1" class="btn btn-secondary">Atrás</a>
+    <button href="?step=3" class="btn btn-primary" id="next-btn" style="display: none;">Siguiente</button>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const captureBtn = document.getElementById('capture-btn');
+        const calibrateBtn = document.getElementById('calibrate-btn');
+        const captureCount = document.getElementById('capture-count');
+        const calibrationResult = document.getElementById('calibration-result');
+        const cameraMatrix = document.getElementById('camera-matrix');
+        const distCoeffs = document.getElementById('dist-coeffs');
+        const nextBtn = document.getElementById('next-btn');
+
+ 
+        let captures = 0;
+
+        if (captureBtn) {
+        captureBtn.addEventListener('click', function() {
+            fetch('{% url "calibrar_camara_paso2" %}', {  // Cambiar esta URL
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: new URLSearchParams({
+                    'action': 'capture'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        captures = data.captures;
+                        captureCount.textContent = `Capturas: ${captures}`;
+                        if (captures >= 10) {
+                            calibrateBtn.disabled = false;
+                            document.getElementById('capture-instructions').style.display = 'none';
+                        }
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Ocurrió un error al capturar la imagen');
+                });
+            });
+        }
+
+        if (calibrateBtn) {
+            calibrateBtn.addEventListener('click', function() {
+            fetch('{% url "calibrar_camara_paso2" %}', {  // Cambiar esta URL
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: new URLSearchParams({
+                    'action': 'calibrate'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        cameraMatrix.textContent = JSON.stringify(data.camera_matrix, null, 2);
+                        distCoeffs.textContent = JSON.stringify(data.dist_coeffs, null, 2);
+                        calibrationResult.style.display = 'block';
+                        nextBtn.style.display = 'inline-block';
+
+
+                        if (nextBtn) {
+                            nextBtn.addEventListener('click', function() {
+            window.location.href = '{% url "calibrar_camara_paso3" %}';  // Cambiar esta URL
+        });}
+        
+
+
+                        
+                        
+                        
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Ocurrió un error al calibrar la cámara');
+                });
             });
         }
     });
+
+    
     </script>
 
+{% elif step == '3' %}
+<h3>Paso 3: Obtención de pixels por metro</h3>
+<p id="capture-instructions">Capture 30 imágenes con el ArUco cerca y 30 imágenes con el ArUco lejos.</p>
+<div class="row">
+    <div class="col-md-6">
+        <div id="stream-container">
+            <img id="stream" src="{% url 'camera_stream' %}?ip_port={{ ip_port }}" alt="Camera Stream">
+        </div>
+    </div>
+    <div class="col-md-6">
+        <button id="capture-near-btn" class="btn btn-primary mb-2">Capturar cerca</button>
+        <button id="capture-far-btn" class="btn btn-primary mb-2">Capturar lejos</button>
+        <button id="calculate-btn" class="btn btn-success mb-2" disabled>Calcular pixels por metro</button>
+        <p id="capture-count-near">Capturas cerca: 0/30</p>
+        <p id="capture-count-far">Capturas lejos: 0/30</p>
+        <div id="calculation-result" style="display: none;">
+            <h4>Resultado:</h4>
+            <p id="pixels-per-meter"></p>
+        </div>
+    </div>
+</div>
+<a href="?step=2" class="btn btn-secondary">Atrás</a>
+<a href="#" class="btn btn-success" id="finish-btn" style="display: none;">Finalizar</a>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const captureNearBtn = document.getElementById('capture-near-btn');
+    const captureFarBtn = document.getElementById('capture-far-btn');
+    const calculateBtn = document.getElementById('calculate-btn');
+    const captureCountNear = document.getElementById('capture-count-near');
+    const captureCountFar = document.getElementById('capture-count-far');
+    const calculationResult = document.getElementById('calculation-result');
+    const pixelsPerMeter = document.getElementById('pixels-per-meter');
+    const finishBtn = document.getElementById('finish-btn');
+
+    let capturesNear = 0;
+    let capturesFar = 0;
+
+    function updateCaptureCount(isNear, count) {
+        if (isNear) {
+            capturesNear = count;
+            captureCountNear.textContent = `Capturas cerca: ${capturesNear}/30`;
+        } else {
+            capturesFar = count;
+            captureCountFar.textContent = `Capturas lejos: ${capturesFar}/30`;
+        }
+        calculateBtn.disabled = !(capturesNear >= 30 && capturesFar >= 30);
+    }
+
+    function captureImage(isNear) {
+        fetch('{% url "calibrar_camara_paso3" %}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: new URLSearchParams({
+                'action': isNear ? 'capture_near' : 'capture_far'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateCaptureCount(isNear, data.captures);
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Ocurrió un error al capturar la imagen');
+        });
+    }
+
+    captureNearBtn.addEventListener('click', () => captureImage(true));
+    captureFarBtn.addEventListener('click', () => captureImage(false));
+
+    calculateBtn.addEventListener('click', function() {
+        fetch('{% url "calibrar_camara_paso3" %}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: new URLSearchParams({
+                'action': 'calculate'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                pixelsPerMeter.textContent = `Pixels por metro: ${data.pixels_per_meter.toFixed(2)}`;
+                calculationResult.style.display = 'block';
+                finishBtn.style.display = 'inline-block';
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Ocurrió un error al calcular los pixels por metro');
+        });
+    });
+});
+</script>
+    {% endif %}
+</div>
 {% endblock %}

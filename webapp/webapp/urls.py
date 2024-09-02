@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from main.views import login_view, monitoring_view,configuracion_view, calibrar_camara,camera_stream
+from main.views import login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso1,calibrar_camara_paso2,calibrar_camara_paso3
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,6 +24,9 @@ urlpatterns = [
     path('monitoreo/', monitoring_view, name='monitoreo'),
     path('configuracion/', configuracion_view, name='configuracion'),
     path('logout/', login_view, name='logout'),
-    path('configuracion/calibrar/',calibrar_camara, name='calibrar_camara'),
+    #path('configuracion/calibrar/',calibrar_camara, name='calibrar_camara'),
     path('camera_stream/', camera_stream, name='camera_stream'),
+    path('configuracion/calibrar/paso1/', calibrar_camara_paso1, name='calibrar_camara_paso1'),
+    path('configuracion/calibrar/paso2/', calibrar_camara_paso2, name='calibrar_camara_paso2'),
+    path('configuracion/calibrar/paso3/', calibrar_camara_paso3, name='calibrar_camara_paso3'),
 ]
