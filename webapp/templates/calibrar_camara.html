@@ -15,30 +15,32 @@
                     <label for="ip_port" class="form-label">IP:Puerto del stream de la cámara</label>
                     <input type="text" class="form-control" id="ip_port" name="ip_port" required>
                 </div>
-                <button type="submit" class="btn btn-primary">Conectar</button>
-            </form>
-
-            <div id="stream-container" class="mt-3" style="display: none;">
-                <!-- El stream se insertará aquí -->
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <form id="camera-info-form" style="display: none;">
                 <div class="mb-3">
                     <label for="camera_name" class="form-label">Nombre de la cámara</label>
-                    <input type="text" class="form-control" id="camera_name" required>
+                    <input type="text" class="form-control" id="camera_name" name="camera_name" required>
                 </div>
                 <div class="mb-3">
                     <label for="ambiente" class="form-label">Ambiente</label>
-                    <select class="form-select" id="ambiente" required>
+                    <select class="form-select" id="ambiente" name="ambiente" required>
                         <option value="">Seleccione un ambiente</option>
-                        <option value="V306">V306</option>
-                        <option value="V307">V307</option>
+                        <option value="CIA">CIA</option>
+                        <option value="OpenPUCP">OpenPUCP</option>
                     </select>
                 </div>
-                <button type="button" id="continue-btn" class="btn btn-primary" disabled>Continuar</button>
+                <div class="mb-3">
+                    <label for="piso" class="form-label">Piso</label>
+                    <select class="form-select" id="piso" name="piso" required>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Conectar</button>
             </form>
+    
+            <div id="stream-container" class="mt-3" style="display: none;">
+                <!-- El stream se insertará aquí -->
+            </div>
         </div>
     </div>
 

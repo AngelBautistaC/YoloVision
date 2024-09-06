@@ -33,8 +33,11 @@ def calibrar_camara_paso1(request):
     context = {'step': '1', 'camera_connected': False}
 
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        
         ip_port = request.POST.get('ip_port')
-        logger.info(f"Paso 1: URL del stream recibida: {ip_port}")
+        camera_name = request.POST.get('camera_name')
+        ambiente = request.POST.get('ambiente')
+        piso = request.POST.get('piso', '1')  # Asumimos piso 1 por defecto
 
         if not ip_port:
             return JsonResponse({'success': False, 'message': 'La URL del stream está vacía'})
@@ -54,10 +57,15 @@ def calibrar_camara_paso1(request):
 
             cap.release()
 
+
             if frame_read:
                 request.session['ip_port'] = ip_port
-                logger.info(f"Conexión exitosa. URL guardada en sesión: {ip_port}")
+                request.session['camera_name'] = camera_name
+                request.session['ambiente'] = ambiente
+                request.session['piso'] = piso
+                logger.info(f"Conexión exitosa. Datos guardados en sesión.")
                 return JsonResponse({'success': True, 'message': 'Conexión exitosa'})
+
             else:
                 logger.error("No se pudo leer un frame después de 30 intentos")
                 return JsonResponse({'success': False, 'message': 'No se pudo leer un frame de la cámara después de 30 intentos'})
@@ -155,6 +163,17 @@ def calibrar_camara_paso2(request):
                 ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
                 
                 if ret:
+                    camera_data = {
+                        "ip_url": ip_port,
+                        "label": request.session.get('camera_name'),
+                        "cam_matrix": mtx.tolist(),
+                        "dist_coeff": dist.tolist(),
+                    }
+                    update_camera_data(
+                        request.session.get('ambiente'),
+                        request.session.get('piso'),
+                        camera_data
+                    )
                     return JsonResponse({
                         'success': True,
                         'camera_matrix': mtx.tolist(),
@@ -224,10 +243,19 @@ def calibrar_camara_paso3(request):
             pixels_per_meter = np.mean(pixels_per_meter_near[:30] + pixels_per_meter_far[:30])
             
             request.session['pixels_per_meter'] = pixels_per_meter
+            camera_data = load_json_data()
+            for amb in camera_data["ambientes"]:
+                if amb["nombreAmbiente"] == request.session.get('ambiente'):
+                    for cam in amb["piso"][request.session.get('piso')]["camara"]:
+                        if cam["ip_url"] == ip_port:
+                            cam["px_m"] = pixels_per_meter
+                            break
+                    break
+            save_json_data(camera_data)
+            
             return JsonResponse({'success': True, 'pixels_per_meter': pixels_per_meter})
 
     return render(request, 'calibrar_camara.html', context)
-
 
 
 def capture_frame(ip_port):
@@ -293,3 +321,60 @@ def camera_stream(request):
 
     return StreamingHttpResponse(gen_frames(ip_port),
                                  content_type='multipart/x-mixed-replace; boundary=frame')
+
+
+#EOF
+#------------------------------------------------------------------------------------------------------------------------------------------#
+
+####SECCION BASE DE DATOS JSON : CAMBIAR A BASE DE DATOS FIREBASE:
+import json
+import os
+
+JSON_FILE_PATH = 'database.json'
+
+def load_json_data():
+    if os.path.exists(JSON_FILE_PATH):
+        with open(JSON_FILE_PATH, 'r') as file:
+            return json.load(file)
+    return {"ambientes": []}
+
+def save_json_data(data):
+    with open(JSON_FILE_PATH, 'w') as file:
+        json.dump(data, file, indent=2)
+
+def update_camera_data(ambiente, piso, camera_data):
+    data = load_json_data()
+    for amb in data["ambientes"]:
+        if amb["nombreAmbiente"] == ambiente:
+            if piso not in amb["piso"]:
+                amb["piso"][piso] = {"camara": []}
+            for cam in amb["piso"][piso]["camara"]:
+                if cam["ip_url"] == camera_data["ip_url"]:
+                    cam.update(camera_data)
+                    break
+            else:
+                amb["piso"][piso]["camara"].append(camera_data)
+            break
+    else:
+        new_ambiente = {
+            "nombreAmbiente": ambiente,
+            "piso": {
+                piso: {
+                    "camara": [camera_data]
+                }
+            }
+        }
+        data["ambientes"].append(new_ambiente)
+    save_json_data(data)
+
+
+
+
+
+
+
+
+
+
+
+
