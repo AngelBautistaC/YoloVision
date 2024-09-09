@@ -36,12 +36,15 @@
                     </select>
                 </div>
                 <button type="submit" class="btn btn-primary">Conectar</button>
+                
             </form>
+            <button type="button" id="continue-btn" class="btn btn-primary">Continuar</button>
     
             <div id="stream-container" class="mt-3" style="display: none;">
                 <!-- El stream se insertará aquí -->
             </div>
         </div>
+        
     </div>
 
     <script>
@@ -235,7 +238,7 @@
 
 {% elif step == '3' %}
 <h3>Paso 3: Obtención de pixels por metro</h3>
-<p id="capture-instructions">Capture 30 imágenes con el ArUco cerca y 30 imágenes con el ArUco lejos.</p>
+<p id="capture-instructions">Capture 5 imágenes con el ArUco cerca y 30 imágenes con el ArUco lejos.</p>
 <div class="row">
     <div class="col-md-6">
         <div id="stream-container">
@@ -246,8 +249,8 @@
         <button id="capture-near-btn" class="btn btn-primary mb-2">Capturar cerca</button>
         <button id="capture-far-btn" class="btn btn-primary mb-2">Capturar lejos</button>
         <button id="calculate-btn" class="btn btn-success mb-2" disabled>Calcular pixels por metro</button>
-        <p id="capture-count-near">Capturas cerca: 0/30</p>
-        <p id="capture-count-far">Capturas lejos: 0/30</p>
+        <p id="capture-count-near">Capturas cerca: 0/5</p>
+        <p id="capture-count-far">Capturas lejos: 0/5</p>
         <div id="calculation-result" style="display: none;">
             <h4>Resultado:</h4>
             <p id="pixels-per-meter"></p>
@@ -267,20 +270,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const calculationResult = document.getElementById('calculation-result');
     const pixelsPerMeter = document.getElementById('pixels-per-meter');
     const finishBtn = document.getElementById('finish-btn');
+    finishBtn.addEventListener('click', function() {
+    window.location.href = '{% url "calibrar_camara_paso_final" %}';
+});
 
     let capturesNear = 0;
     let capturesFar = 0;
 
     function updateCaptureCount(isNear, count) {
-        if (isNear) {
-            capturesNear = count;
-            captureCountNear.textContent = `Capturas cerca: ${capturesNear}/30`;
-        } else {
-            capturesFar = count;
-            captureCountFar.textContent = `Capturas lejos: ${capturesFar}/30`;
-        }
-        calculateBtn.disabled = !(capturesNear >= 30 && capturesFar >= 30);
+    if (isNear) {
+        capturesNear = count;
+        captureCountNear.textContent = `Capturas cerca: ${capturesNear}/5`;
+    } else {
+        capturesFar = count;
+        captureCountFar.textContent = `Capturas lejos: ${capturesFar}/5`;
     }
+    calculateBtn.disabled = !(capturesNear >= 5 && capturesFar >= 5);
+}
 
     function captureImage(isNear) {
         fetch('{% url "calibrar_camara_paso3" %}', {
@@ -327,6 +333,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 pixelsPerMeter.textContent = `Pixels por metro: ${data.pixels_per_meter.toFixed(2)}`;
                 calculationResult.style.display = 'block';
                 finishBtn.style.display = 'inline-block';
+                
             } else {
                 alert(data.message);
             }
@@ -338,6 +345,46 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-    {% endif %}
+
+
+
+{% elif step == 'final' %}
+<div class="text-center">
+    <h3>Calibración Completada</h3>
+    <div class="my-4">
+        <i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i>
+    </div>
+    <p class="lead">La calibración de la cámara se ha completado con éxito.</p>
+    <div class="mt-4">
+        <h4>Resumen de la Calibración:</h4>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item">Cámara: <span id="camera-name"></span></li>
+            <li class="list-group-item">Ambiente: <span id="ambiente"></span></li>
+            <li class="list-group-item">Piso: <span id="piso"></span></li>
+            <li class="list-group-item">Pixels por metro: <span id="pixels-per-meter"></span></li>
+        </ul>
+    </div>
+    <div class="mt-4">
+        <a href="{% url 'configuracion' %}" class="btn btn-primary">
+            <i class="bi bi-arrow-left-circle me-2"></i>Volver a Configuración
+        </a>
+        <a href="{% url 'calibrar_camara_paso1' %}" class="btn btn-success">
+            <i class="bi bi-camera me-2"></i>Calibrar otra cámara
+        </a>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Rellenar los datos de la calibración
+    document.getElementById('camera-name').textContent = '{{ camera_name }}';
+    document.getElementById('ambiente').textContent = '{{ ambiente }}';
+    document.getElementById('piso').textContent = '{{ piso }}';
+    document.getElementById('pixels-per-meter').textContent = '{{ pixels_per_meter }}';
+});
+</script>
+{% endif %}
+
+
 </div>
 {% endblock %}

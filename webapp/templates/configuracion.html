@@ -29,15 +29,17 @@
         </a>
         </div>
         <div class="col-md-5 mb-4 d-flex">
-            <div class="card config-card w-100">
-                <div class="card-body text-center d-flex flex-column justify-content-between">
-                    <div>
-                        <i class="bi bi-person-bounding-box config-icon"></i>
-                        <h5 class="card-title mt-3">Configurar</h5>
+            <a href="{% url 'configurar_deteccion' %}" class="text-decoration-none w-100">
+                <div class="card config-card w-100">
+                    <div class="card-body text-center d-flex flex-column justify-content-between">
+                        <div>
+                            <i class="bi bi-person-bounding-box config-icon"></i>
+                            <h5 class="card-title mt-3">Configurar</h5>
+                        </div>
+                        <p class="card-text">Configura la detección en un área utilizando una cámara ya calibrada</p>
                     </div>
-                    <p class="card-text">Configura la detección en un área utilizando una cámara ya calibrada</p>
                 </div>
-            </div>
+            </a>
         </div>
     </div>
 </div>
