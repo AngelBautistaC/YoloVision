@@ -133,7 +133,7 @@ def stream_video(request):
             
             if tracking_data:
                 frame = track_and_count(frame, model, tracking_data['track_history'], tracking_data['counting_regions'])
-            
+
             if not detection_paused:
                 results = model(frame, classes=[60], conf=0.1)
                 new_detections = []
@@ -170,7 +170,7 @@ def stream_video(request):
                     detections = new_detections
                     detection_paused = True
                     request.session['detections'] = detections
-            
+
             for detection in detections:
                 cv2.polylines(frame, [np.array(detection['points'], dtype=np.int32)], 
                               isClosed=True, color=detection['color'], thickness=2)
@@ -260,16 +260,22 @@ def agregar_poligono(request):
     return JsonResponse({'error': 'Método no permitido'})
 
 
+
 def quitar_poligono(request):
     if request.method == 'POST':
         polygon_id = request.POST.get('polygon_id')
         detections = request.session.get('detections', [])
+        manual_polygons = request.session.get('manual_polygons', [])
+        
         detections = [d for d in detections if d['id'] != polygon_id]
+        manual_polygons = [p for p in manual_polygons if p['id'] != polygon_id]
+        
         request.session['detections'] = detections
+        request.session['manual_polygons'] = manual_polygons
+        
         return JsonResponse({'success': True})
     
     return JsonResponse({'error': 'Método no permitido'})
-
 
 
 def actualizar_poligono(request):
