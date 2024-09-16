@@ -1,3 +1,4 @@
+from collections import defaultdict
 import uuid
 from django.shortcuts import render, redirect
 import cv2
@@ -6,7 +7,8 @@ from django.http import StreamingHttpResponse, HttpResponseBadRequest,JsonRespon
 import urllib.request
 from django.shortcuts import render
 import numpy as np
-from .tracker import initialize_tracking, initialize_counting_regions, track_and_count
+from shapely.geometry import Polygon
+from shapely.geometry.point import Point
 from ultralytics import YOLO
 import base64
 import math
@@ -30,6 +32,67 @@ en su defecto, quitar esta opcion y que se haga un rezising automatico cuando se
 
 ####SECCION CONFIGURAR DETECCION PARA UNA CAMARA CALIBRADA:
 #----------------------------------------------------------------------------------------------------------------------------------------
+
+def initialize_tracking():
+    return defaultdict(list)
+
+def initialize_counting_regions(polygon, max_persons):
+    return [
+        {
+            "name": "Table Region",
+            "polygon": Polygon(polygon),
+            "counts": 0,
+            "max_persons": max_persons,
+            "region_color": (0, 255, 0),
+            "text_color": (255, 255, 255),
+        }
+    ]
+
+def track_and_count(frame, model, track_history, counting_regions):
+    results = model.track(frame, persist=True, classes=[0], conf=0.1, iou=0.5)
+
+    if results[0].boxes.id is not None:
+        boxes = results[0].boxes.xyxy.cpu()
+        track_ids = results[0].boxes.id.int().cpu().tolist()
+        clss = results[0].boxes.cls.cpu().tolist()
+
+        for box, track_id, cls in zip(boxes, track_ids, clss):
+            bbox_center = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+
+            track = track_history[track_id]
+            track.append((float(bbox_center[0]), float(bbox_center[1])))
+            if len(track) > 30:
+                track.pop(0)
+            points = np.hstack(track).astype(np.int32).reshape((-1, 1, 2))
+            cv2.polylines(frame, [points], isClosed=False, color=(0, 255, 0), thickness=2)
+
+            # Check if detection inside region
+            for region in counting_regions:
+                if region["polygon"].contains(Point((bbox_center[0], bbox_center[1]))):
+                    region["counts"] += 1
+
+    # Draw regions and display counts
+    for region in counting_regions:
+        region_label = f"{region['counts']}/{region['max_persons']}"
+        region_color = region["region_color"]
+        region_text_color = region["text_color"]
+
+        polygon_coords = np.array(region["polygon"].exterior.coords, dtype=np.int32)
+        centroid_x, centroid_y = int(region["polygon"].centroid.x), int(region["polygon"].centroid.y)
+
+        text_size, _ = cv2.getTextSize(region_label, cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.7, thickness=2)
+        text_x = centroid_x - text_size[0] // 2
+        text_y = centroid_y + text_size[1] // 2
+        cv2.rectangle(frame, (text_x - 5, text_y - text_size[1] - 5), (text_x + text_size[0] + 5, text_y + 5), region_color, -1)
+        cv2.putText(frame, region_label, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, region_text_color, 2)
+        cv2.polylines(frame, [polygon_coords], isClosed=True, color=region_color, thickness=2)
+
+    # Reset counts for each region
+    for region in counting_regions:
+        region["counts"] = 0
+
+    return frame
+
 
 
 
@@ -84,126 +147,164 @@ def obtener_detecciones(request):
     all_polygons = detected_polygons + manual_polygons
     return JsonResponse({'detections': all_polygons})
 
+def detectar_mesas(request):
+    if request.method == 'POST':
+        camera_data = request.session.get('camera_data')
+        if not camera_data:
+            return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
+
+        ip_url = camera_data['ip_url']
+        pixels_per_meter = camera_data['px_m']
+
+        cap = cv2.VideoCapture(ip_url)
+        success, frame = cap.read()
+        cap.release()
+
+        if not success:
+            return JsonResponse({'error': 'No se pudo capturar el frame'})
+
+        # Resize frame to 640x480
+        frame = cv2.resize(frame, (640, 480))
+
+        model = YOLO('yolov8n-seg.pt')
+
+        results = model(frame, classes=[60], conf=0.1)
+
+        detected_polygons = []
+
+        for result in results:
+            masks = result.masks
+            if masks is not None:
+                for i, mask in enumerate(masks):
+                    mask_array = mask.xy[0].astype(int)
+                    polygon = cv2.convexHull(mask_array)
+                    simplified_polygon = simplify_polygon(polygon)
+                    if len(simplified_polygon) > 2:
+                        detected_polygons.append({
+                            'id': str(uuid.uuid4()),
+                            'points': simplified_polygon.tolist(),
+                            'label': f"Tabla {i+1}",
+                            'color': generate_random_color(),
+                            'type': 'detected'
+                        })
+        
+        request.session['detections'] = detected_polygons
+
+        return JsonResponse({'success': True, 'detections': detected_polygons})
+
+    return JsonResponse({'error': 'Método no permitido'})
+
 
 def iniciar_tracking(request):
     if request.method == 'POST':
-        polygon_id = request.POST.get('id')
-        detected_polygons = request.session.get('detections', [])
-        manual_polygons = request.session.get('manual_polygons', [])
-        
-        for polygon_list in [detected_polygons, manual_polygons]:
-            for polygon in polygon_list:
-                if polygon['id'] == polygon_id:
-                    expanded_polygon = expand_polygon(polygon['points'], 0.3, request.session['camera_data']['px_m'])
-                    track_history = initialize_tracking()
-                    counting_regions = initialize_counting_regions(expanded_polygon, polygon['max_personas'])
-                    
-                    request.session['tracking_data'] = {
-                        'polygon': polygon,
-                        'expanded_polygon': expanded_polygon,
-                        'track_history': track_history,
-                        'counting_regions': counting_regions
-                    }
-                    
-                    return JsonResponse({'success': True})
-        
-        return JsonResponse({'error': 'Polígono no encontrado'})
-    
+        data = json.loads(request.body)
+        polygons = data.get('polygons', [])
+        camera_data = request.session.get('camera_data')
+        if not camera_data:
+            return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
+
+        ip_url = camera_data['ip_url']
+        db_data = load_json_data()
+        camera = None
+        for ambiente in db_data['ambientes']:
+            for piso, piso_data in ambiente['piso'].items():
+                for cam in piso_data.get('camara', []):
+                    if cam['ip_url'] == ip_url:
+                        camera = cam
+                        break
+        if not camera:
+            return JsonResponse({'error': 'Cámara no encontrada en la base de datos'})
+
+        # Save polygons under 'mesas' in the camera data
+        camera['mesas'] = polygons
+
+        # Save the database
+        save_json_data(db_data)
+
+        # Store polygon IDs in session
+        polygon_ids = [polygon['id'] for polygon in polygons]
+        request.session['tracking_polygon_ids'] = polygon_ids
+
+        return JsonResponse({'success': True})
     return JsonResponse({'error': 'Método no permitido'})
 
 def stream_video(request):
     camera_data = request.session.get('camera_data')
     if not camera_data:
         return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
-    
+
     ip_url = camera_data['ip_url']
     pixels_per_meter = camera_data['px_m']
-    
+
     def generate_frames():
         cap = cv2.VideoCapture(ip_url)
-        model = YOLO('yolov8m-seg.pt')
-        detection_paused = False
-        detections = []
-        tracking_data = request.session.get('tracking_data')
+        model = YOLO('yolov8n-seg.pt')
+
+        # Initialize tracking data here
+        # Load polygons from 'database.json' for the current camera
+        db_data = load_json_data()
+        camera = None
+        for ambiente in db_data['ambientes']:
+            for piso, piso_data in ambiente['piso'].items():
+                for cam in piso_data.get('camara', []):
+                    if cam['ip_url'] == ip_url:
+                        camera = cam
+                        break
+        if not camera:
+            cap.release()
+            return  # or yield an error frame
+
+        polygons = camera.get('mesas', [])
+        tracking_data_list = []
+        for polygon in polygons:
+            expanded_polygon = expand_polygon(polygon['points'], 0.3, pixels_per_meter)
+            track_history = initialize_tracking()
+            counting_regions = initialize_counting_regions(expanded_polygon, polygon['max_personas'])
+            tracking_data_list.append({
+                'polygon': polygon,
+                'expanded_polygon': expanded_polygon,
+                'track_history': track_history,
+                'counting_regions': counting_regions
+            })
+
         
         while True:
             success, frame = cap.read()
             if not success:
                 break
-            
-            if tracking_data:
-                frame = track_and_count(frame, model, tracking_data['track_history'], tracking_data['counting_regions'])
+            frame = cv2.resize(frame, (640, 480))
+            # Perform tracking and counting for each polygon
+            for tracking_data in tracking_data_list:
+                frame = track_and_count(
+                    frame, model, tracking_data['track_history'], tracking_data['counting_regions']
+                )
 
-            if not detection_paused:
-                results = model(frame, classes=[60], conf=0.1)
-                new_detections = []
-                for result in results:
-                    masks = result.masks
-                    if masks is not None:
-                        for i, mask in enumerate(masks):
-                            mask_array = mask.xy[0].astype(int)
-                            polygon = cv2.convexHull(mask_array)
-                            simplified_polygon = simplify_polygon(polygon)
-                            if len(simplified_polygon) > 2:
-                                new_detection = {
-                                    'id': str(uuid.uuid4()),
-                                    'points': simplified_polygon.tolist(),
-                                    'label': f"Mesa {i+1}",
-                                    'color': generate_random_color(),
-                                    'type': 'detected'
-                                }
-                                
-                                # Calcular información adicional
-                                area_pixels = cv2.contourArea(np.array(simplified_polygon))
-                                area_meters = area_pixels / (pixels_per_meter ** 2)
-                                perimeter_pixels = cv2.arcLength(np.array(simplified_polygon), True)
-                                perimeter_meters = perimeter_pixels / pixels_per_meter
-                                personas = math.floor(perimeter_meters / 1.15)  # 1.15 es personas_por_perimetro
-                                
-                                new_detection['area'] = area_meters
-                                new_detection['perimeter'] = perimeter_meters
-                                new_detection['max_personas'] = personas
-                                
-                                new_detections.append(new_detection)
-                
-                if new_detections:
-                    detections = new_detections
-                    detection_paused = True
-                    request.session['detections'] = detections
-
-            for detection in detections:
-                cv2.polylines(frame, [np.array(detection['points'], dtype=np.int32)], 
-                              isClosed=True, color=detection['color'], thickness=2)
-                text_position = tuple(map(int, detection['points'][0]))
-                cv2.putText(frame, detection['label'], text_position, 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, detection['color'], 2)
-                
-                # Mostrar información adicional
-                info_text = f"Area: {detection['area']:.2f}m2 | Max: {detection['max_personas']}"
-                cv2.putText(frame, info_text, (text_position[0], text_position[1] + 20), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, detection['color'], 1)
-            
-            # Dibujar polígonos manuales
-            manual_polygons = request.session.get('manual_polygons', [])
-            for polygon in manual_polygons:
-                cv2.polylines(frame, [np.array(polygon['points'], dtype=np.int32)], 
-                              isClosed=True, color=polygon['color'], thickness=2)
-                text_position = tuple(map(int, polygon['points'][0]))
-                cv2.putText(frame, polygon['label'], text_position, 
+            # Draw polygons
+            for tracking_data in tracking_data_list:
+                polygon = tracking_data['polygon']
+                points = np.array(polygon['points'], dtype=np.int32)
+                cv2.polylines(frame, [points], isClosed=True, color=polygon['color'], thickness=2)
+                text_position = tuple(map(int, points[0]))
+                cv2.putText(frame, polygon['label'], text_position,
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, polygon['color'], 2)
-                
+
+                # Mostrar información adicional
                 info_text = f"Area: {polygon['area']:.2f}m2 | Max: {polygon['max_personas']}"
-                cv2.putText(frame, info_text, (text_position[0], text_position[1] + 20), 
+                cv2.putText(frame, info_text, (text_position[0], text_position[1] + 20),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.4, polygon['color'], 1)
-            
+
             _, buffer = cv2.imencode('.jpg', frame)
             frame_bytes = buffer.tobytes()
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        
+
         cap.release()
-    
+
     return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
+
+
+
+
 
 def generate_random_color():
     return tuple(np.random.randint(0, 255, 3).tolist())
@@ -214,16 +315,46 @@ def etiquetar_poligono(request):
         polygon_id = request.POST.get('polygon_id')
         new_label = request.POST.get('label')
         detections = request.session.get('detections', [])
+        manual_polygons = request.session.get('manual_polygons', [])
         
-        for detection in detections:
+        updated = False
+        
+        for detection in detections + manual_polygons:
             if detection['id'] == polygon_id:
                 detection['label'] = new_label
+                updated = True
                 break
+
+        # Update in database.json if necessary
+        camera_data = request.session.get('camera_data')
+        if camera_data:
+            ip_url = camera_data['ip_url']
+            db_data = load_json_data()
+            camera = None
+            for ambiente in db_data['ambientes']:
+                for piso, piso_data in ambiente['piso'].items():
+                    for cam in piso_data.get('camara', []):
+                        if cam['ip_url'] == ip_url:
+                            camera = cam
+                            break
+            if camera:
+                mesas = camera.get('mesas', [])
+                for mesa in mesas:
+                    if mesa['id'] == polygon_id:
+                        mesa['label'] = new_label
+                        save_json_data(db_data)
+                        break
         
-        request.session['detections'] = detections
-        return JsonResponse({'success': True})
+        if updated:
+            request.session['detections'] = detections
+            request.session['manual_polygons'] = manual_polygons
+            return JsonResponse({'success': True})
+        
+        return JsonResponse({'error': 'Polígono no encontrado'})
     
     return JsonResponse({'error': 'Método no permitido'})
+
+
 
 
 def agregar_poligono(request):
@@ -252,9 +383,10 @@ def agregar_poligono(request):
         new_polygon['max_personas'] = personas
         
         manual_polygons = request.session.get('manual_polygons', [])
+        manual_polygons = [p for p in manual_polygons if p['id'] != new_polygon['id']]
         manual_polygons.append(new_polygon)
         request.session['manual_polygons'] = manual_polygons
-        
+
         return JsonResponse({'success': True, 'polygon': new_polygon})
     
     return JsonResponse({'error': 'Método no permitido'})
@@ -293,7 +425,7 @@ def actualizar_poligono(request):
                 if polygon['id'] == polygon_id:
                     polygon['points'] = new_points
                     
-                    # Recalcular información
+                    # Recalculate area, perimeter, and max persons
                     area_pixels = cv2.contourArea(np.array(new_points, dtype=np.int32))
                     area_meters = area_pixels / (pixels_per_meter ** 2)
                     perimeter_pixels = cv2.arcLength(np.array(new_points, dtype=np.int32), True)
@@ -343,41 +475,92 @@ def simplify_polygon(polygon, target_points=6):
         approx = np.array(new_points)
     return approx.squeeze()
 
+
 def expand_polygon(polygon, distance, pixels_per_meter):
     poly_np = np.array(polygon, dtype=np.float32)
     M = cv2.moments(poly_np)
+    if M['m00'] == 0:
+        return polygon  # Return the original polygon if area is zero to avoid division by zero
     cx = int(M['m10'] / M['m00'])
     cy = int(M['m01'] / M['m00'])
     center = np.array([cx, cy])
     expanded = []
     for point in poly_np:
         vector = point - center
-        vector_norm = vector / np.linalg.norm(vector)
+        norm = np.linalg.norm(vector)
+        if norm == 0:
+            vector_norm = vector
+        else:
+            vector_norm = vector / norm
         expanded_point = point + vector_norm * distance * pixels_per_meter
-        expanded.append(expanded_point)
+        expanded.append(expanded_point.tolist())  # Convert to list for JSON serialization
     return expanded
 
 
+
+
 def obtener_info_mesas(request):
+    camera_data = request.session.get('camera_data')
+    if not camera_data:
+        return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
+
+    ip_url = camera_data['ip_url']
+    # Load polygons from 'database.json' for the current camera
+    db_data = load_json_data()
+    camera = None
+    for ambiente in db_data['ambientes']:
+        for piso, piso_data in ambiente['piso'].items():
+            for cam in piso_data.get('camara', []):
+                if cam['ip_url'] == ip_url:
+                    camera = cam
+                    break
+    if not camera:
+        return JsonResponse({'error': 'Cámara no encontrada en la base de datos'})
+
+    polygons = camera.get('mesas', [])
+
+    # Also include polygons from session (detections and manual_polygons)
     detected_polygons = request.session.get('detections', [])
     manual_polygons = request.session.get('manual_polygons', [])
-    all_polygons = detected_polygons + manual_polygons
+    all_polygons = polygons + detected_polygons + manual_polygons
+
     return JsonResponse({'mesas': all_polygons})
+
 def quitar_poligono(request):
     if request.method == 'POST':
         polygon_id = request.POST.get('polygon_id')
+        # Remove from session
         detections = request.session.get('detections', [])
         manual_polygons = request.session.get('manual_polygons', [])
-        
         detections = [d for d in detections if d['id'] != polygon_id]
         manual_polygons = [p for p in manual_polygons if p['id'] != polygon_id]
-        
         request.session['detections'] = detections
         request.session['manual_polygons'] = manual_polygons
-        
+
+        # Remove from database.json
+        camera_data = request.session.get('camera_data')
+        if camera_data:
+            ip_url = camera_data['ip_url']
+            db_data = load_json_data()
+            camera = None
+            for ambiente in db_data['ambientes']:
+                for piso, piso_data in ambiente['piso'].items():
+                    for cam in piso_data.get('camara', []):
+                        if cam['ip_url'] == ip_url:
+                            camera = cam
+                            break
+            if camera:
+                mesas = camera.get('mesas', [])
+                mesas = [m for m in mesas if m['id'] != polygon_id]
+                camera['mesas'] = mesas
+                save_json_data(db_data)
+
         return JsonResponse({'success': True})
-    
+
     return JsonResponse({'error': 'Método no permitido'})
+
+
+
 #----------------------------------------------------------------------------------------------------------------------------------------
 
 

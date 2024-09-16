@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from main.views import login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso2,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas
+from main.views import login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso2,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -39,5 +39,7 @@ urlpatterns = [
     path('configuracion/quitar-poligono/', quitar_poligono, name='quitar_poligono'),
     path('configuracion/obtener-detecciones/',obtener_detecciones, name='obtener_detecciones'),
     path('configuracion/obtener_info_mesas/',obtener_info_mesas, name='obtener_info_mesas'),
+    path('configuracion/iniciar-tracking/', iniciar_tracking, name='iniciar_tracking'),
+    path('configuracion/detectar-mesas/', detectar_mesas, name='detectar_mesas'),
 
 ]
