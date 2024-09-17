@@ -70,10 +70,11 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch('{% url "obtener_info_mesas" %}')
         .then(response => response.json())
         .then(data => {
-            detections = data.mesas;
+            detections = data.mesas;  // Only session polygons
+            backendPolygons = data.backend_polygons;  // Backend polygons
             const tableBody = document.querySelector('#table-polygons tbody');
             tableBody.innerHTML = '';
-            data.mesas.forEach(mesa => {
+            detections.forEach(mesa => {
                 const row = `
                     <tr>
                         <td>${mesa.id}</td>
@@ -92,6 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
             drawPolygons();
         });
     }
+
 
     setInterval(updatePolygonTable, 1000);
 
@@ -129,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     detections = data.detections;
                     updatePolygonTable();
-                    startPolygonDetection();
+                    // Removed startPolygonDetection as it's not necessary here
                 } else {
                     alert(data.error);
                 }
@@ -143,6 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
         alert('Ocurrió un error al iniciar la detección');
     });
 });
+
 
 
 
@@ -160,34 +163,58 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function drawPolygons() {
-        ctx.clearRect(0, 0, polygonCanvas.width, polygonCanvas.height);
-        detections.forEach(detection => {
+    ctx.clearRect(0, 0, polygonCanvas.width, polygonCanvas.height);
+
+    // Draw backend polygons
+    backendPolygons.forEach(polygon => {
+        ctx.beginPath();
+        let points = polygon.points;
+        ctx.moveTo(points[0][0], points[0][1]);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i][0], points[i][1]);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = 'blue';  // Different color for backend polygons
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Draw label
+        ctx.fillStyle = 'black';
+        ctx.font = '12px Arial';
+        ctx.fillText(polygon.label, points[0][0], points[0][1] - 10);
+    });
+
+    // Draw session polygons (detections and manual polygons)
+    detections.forEach(detection => {
+        ctx.beginPath();
+        let points = detection.points;
+        ctx.moveTo(points[0][0], points[0][1]);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i][0], points[i][1]);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = `rgb(${detection.color.join(',')})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Draw vertices
+        ctx.fillStyle = 'red';
+        points.forEach((point, index) => {
             ctx.beginPath();
-            let points = detection.points;
-            ctx.moveTo(points[0][0], points[0][1]);
-            for (let i = 1; i < points.length; i++) {
-                ctx.lineTo(points[i][0], points[i][1]);
-            }
-            ctx.closePath();
-            ctx.strokeStyle = `rgb(${detection.color.join(',')})`;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // Draw vertices
-            ctx.fillStyle = 'red';
-            points.forEach((point, index) => {
-                ctx.beginPath();
-                ctx.arc(point[0], point[1], 5, 0, 2 * Math.PI);
-                ctx.fill();
-            });
-
-            // Draw label
-            ctx.fillStyle = 'black';
-            ctx.font = '12px Arial';
-            ctx.fillText(detection.label, points[0][0], points[0][1] - 10);
+            ctx.arc(point[0], point[1], 5, 0, 2 * Math.PI);
+            ctx.fill();
         });
-    }
-videoStream.addEventListener('load', function() {
+
+        // Draw label
+        ctx.fillStyle = 'black';
+        ctx.font = '12px Arial';
+        ctx.fillText(detection.label, points[0][0], points[0][1] - 10);
+    });
+}
+
+
+
+    videoStream.addEventListener('load', function() {
     // Ensure canvas dimensions match displayed video dimensions
     polygonCanvas.width = videoStream.clientWidth;
     polygonCanvas.height = videoStream.clientHeight;
@@ -255,28 +282,31 @@ videoStream.addEventListener('load', function() {
     }
 
     polygonCanvas.addEventListener('mousedown', function(e) {
-        const rect = polygonCanvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+    const rect = polygonCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (polygonCanvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (polygonCanvas.height / rect.height);
 
-        selectedPolygon = null;
-        selectedVertexIndex = null;
+    selectedPolygon = null;
+    selectedVertexIndex = null;
 
-        detections.forEach(polygon => {
-            polygon.points.forEach((point, index) => {
-                const dx = point[0] - x;
-                const dy = point[1] - y;
-                if (Math.sqrt(dx * dx + dy * dy) < 5) {
-                    selectedPolygon = polygon;
-                    selectedVertexIndex = index;
-                }
-            });
+    // Only check session polygons
+    detections.forEach(polygon => {
+        polygon.points.forEach((point, index) => {
+            const dx = point[0] - x;
+            const dy = point[1] - y;
+            if (Math.sqrt(dx * dx + dy * dy) < 5) {
+                selectedPolygon = polygon;
+                selectedVertexIndex = index;
+            }
         });
-
-        if (selectedPolygon && selectedVertexIndex !== null) {
-            isDragging = true;
-        }
     });
+
+    if (selectedPolygon && selectedVertexIndex !== null) {
+        isDragging = true;
+    }
+});
+
+
 
     polygonCanvas.addEventListener('mousemove', function(e) {
         if (isDragging && selectedPolygon && selectedVertexIndex !== null) {
@@ -376,11 +406,16 @@ videoStream.addEventListener('load', function() {
         .then(data => {
             if (data.success) {
                 alert('Polígonos guardados y detección iniciada');
+                detections = [];
+                trackingActive = true;  // Set trackingActive to true
+                updatePolygonTable();
+                videoStream.src = '{% url "stream_video" %}?t=' + new Date().getTime();
             } else {
                 alert(data.error);
             }
         });
     });
+
 
     window.addEventListener('resize', function() {
         polygonCanvas.width = videoStream.naturalWidth;
