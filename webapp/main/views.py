@@ -3,7 +3,7 @@ import uuid
 from django.shortcuts import render, redirect
 import cv2
 import logging
-from django.http import StreamingHttpResponse, HttpResponseBadRequest,JsonResponse
+from django.http import HttpResponse, StreamingHttpResponse, HttpResponseBadRequest,JsonResponse
 import urllib.request
 from django.shortcuts import render
 import numpy as np
@@ -207,7 +207,6 @@ def detectar_mesas(request):
 
 
 
-
 def iniciar_tracking(request):
     if request.method == 'POST':
         data = json.loads(request.body)
@@ -219,30 +218,41 @@ def iniciar_tracking(request):
         ip_url = camera_data['ip_url']
         db_data = load_json_data()
         camera = None
+        ambiente_name = None
+        piso_number = None
         for ambiente in db_data['ambientes']:
             for piso, piso_data in ambiente['piso'].items():
                 for cam in piso_data.get('camara', []):
                     if cam['ip_url'] == ip_url:
                         camera = cam
+                        ambiente_name = ambiente['nombreAmbiente']
+                        piso_number = piso
                         break
+                if camera:
+                    break
+            if camera:
+                break
         if not camera:
             return JsonResponse({'error': 'Cámara no encontrada en la base de datos'})
 
         # Save polygons under 'mesas' in the camera data
         camera['mesas'] = polygons
 
+        # Generate a UUID for the camera if not already present
+        if 'uuid' not in camera:
+            camera_uuid = str(uuid.uuid4())
+            camera['uuid'] = camera_uuid
+        else:
+            camera_uuid = camera['uuid']
+
         # Save the database
         save_json_data(db_data)
 
-        # Store polygon IDs in session
-        polygon_ids = [polygon['id'] for polygon in polygons]
-        request.session['tracking_polygon_ids'] = polygon_ids
-
-        # Set tracking_active to True
-        request.session['tracking_active'] = True
-
-        return JsonResponse({'success': True})
+        # Return success message and camera UUID
+        return JsonResponse({'success': True, 'camera_uuid': camera_uuid})
     return JsonResponse({'error': 'Método no permitido'})
+
+
 
 
 
@@ -992,8 +1002,137 @@ def update_camera_data(ambiente, piso, camera_data):
     save_json_data(data)
 
 
+#Seccion supervisar camara:
+
+def supervisar_camara(request, camera_uuid):
+    db_data = load_json_data()
+    camera = None
+    ambiente_name = None
+    piso_number = None
+    for ambiente in db_data['ambientes']:
+        for piso, piso_data in ambiente['piso'].items():
+            for cam in piso_data.get('camara', []):
+                if cam.get('uuid') == str(camera_uuid):
+                    camera = cam
+                    ambiente_name = ambiente['nombreAmbiente']
+                    piso_number = piso
+                    break
+            if camera:
+                break
+        if camera:
+            break
+    if not camera:
+        return HttpResponse("Cámara no encontrada", status=404)
+
+    context = {
+        'camera': camera,
+        'ambiente': ambiente_name,
+        'piso': piso_number,
+        'camera_uuid': camera_uuid,
+    }
+    return render(request, 'supervisar_camara.html', context)
 
 
+def stream_supervisar_camara(request, camera_uuid):
+    # Similar to stream_video, but retrieve camera data by UUID
+    db_data = load_json_data()
+    camera = None
+    for ambiente in db_data['ambientes']:
+        for piso, piso_data in ambiente['piso'].items():
+            for cam in piso_data.get('camara', []):
+                if cam.get('uuid') == str(camera_uuid):
+                    camera = cam
+                    break
+            if camera:
+                break
+        if camera:
+            break
+    if not camera:
+        return HttpResponse("Cámara no encontrada", status=404)
+
+    ip_url = camera['ip_url']
+    pixels_per_meter = camera['px_m']
+
+    def generate_frames():
+        cap = cv2.VideoCapture(ip_url)
+        model = YOLO('yolov8n.pt')  # or the appropriate model
+
+        # Initialize tracking data
+        polygons = camera.get('mesas', [])
+        tracking_data_list = []
+        for polygon in polygons:
+            expanded_polygon = expand_polygon(polygon['points'], 0.3, pixels_per_meter)
+            track_history = initialize_tracking()
+            counting_regions = initialize_counting_regions(expanded_polygon, polygon['max_personas'])
+            tracking_data_list.append({
+                'polygon': polygon,
+                'expanded_polygon': expanded_polygon,
+                'track_history': track_history,
+                'counting_regions': counting_regions
+            })
+
+        while True:
+            success, frame = cap.read()
+            if not success:
+                break
+            frame = cv2.resize(frame, (640, 480))
+
+            # Perform tracking and counting for each polygon
+            for tracking_data in tracking_data_list:
+                frame = track_and_count(
+                    frame, model, tracking_data['track_history'], tracking_data['counting_regions']
+                )
+
+                # Update personas_Detectadas
+                personas_detectadas = tracking_data['counting_regions'][0]['counts']
+                tracking_data['polygon']['personas_Detectadas'] = personas_detectadas
+                tracking_data['counting_regions'][0]['counts'] = 0  # Reset counts
+
+            # Draw polygons
+            for tracking_data in tracking_data_list:
+                polygon = tracking_data['polygon']
+                points = np.array(polygon['points'], dtype=np.int32)
+                cv2.polylines(frame, [points], isClosed=True, color=polygon['color'], thickness=2)
+                text_position = tuple(map(int, points[0]))
+                cv2.putText(frame, polygon['label'], text_position,
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, polygon['color'], 2)
+
+                # Display additional information
+                info_text = f"Area: {polygon['area']:.2f}m² | Max: {polygon['max_personas']} | Detectadas: {polygon.get('personas_Detectadas', 0)}"
+                cv2.putText(frame, info_text, (text_position[0], text_position[1] + 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, polygon['color'], 1)
+
+            # Optionally save updated counts back to database.json
+            save_json_data(db_data)
+
+            _, buffer = cv2.imencode('.jpg', frame)
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+        cap.release()
+
+    return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
+
+def obtener_info_mesas_uuid(request, camera_uuid):
+    db_data = load_json_data()
+    camera = None
+    for ambiente in db_data['ambientes']:
+        for piso, piso_data in ambiente['piso'].items():
+            for cam in piso_data.get('camara', []):
+                if cam.get('uuid') == str(camera_uuid):
+                    camera = cam
+                    break
+            if camera:
+                break
+        if camera:
+            break
+    if not camera:
+        return JsonResponse({'error': 'Cámara no encontrada'})
+
+    polygons = camera.get('mesas', [])
+
+    return JsonResponse({'mesas': polygons})
 
 
 

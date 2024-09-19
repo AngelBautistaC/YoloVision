@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Supervisar Cámara</h2>
+    <div class="row">
+        <div class="col-md-6">
+            <h3>{{ camera.label }}</h3>
+            <p>Ambiente: {{ ambiente }}</p>
+            <p>Piso: {{ piso }}</p>
+            <div id="video-container">
+                <img id="video-stream" src="{% url 'stream_supervisar_camara' camera_uuid=camera_uuid %}" alt="Video stream" style="width: 100%; height: auto;">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <h3>Información de Mesas</h3>
+            <table class="table" id="table-mesas">
+                <thead>
+                    <tr>
+                        <th>Etiqueta</th>
+                        <th>Máx. Personas</th>
+                        <th>Personas Detectadas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Rows will be populated via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tableBody = document.querySelector('#table-mesas tbody');
+
+    function updateTableData() {
+        fetch('{% url "obtener_info_mesas_uuid" camera_uuid=camera_uuid %}')
+        .then(response => response.json())
+        .then(data => {
+            tableBody.innerHTML = '';
+            data.mesas.forEach(mesa => {
+                const row = `
+                    <tr>
+                        <td>${mesa.label}</td>
+                        <td>${mesa.max_personas}</td>
+                        <td>${mesa.personas_Detectadas || 0}</td>
+                    </tr>
+                `;
+                tableBody.innerHTML += row;
+            });
+        });
+    }
+
+    // Update table data every few seconds
+    setInterval(updateTableData, 3000);
+    // Initial call
+    updateTableData();
+});
+</script>
+{% endblock %}

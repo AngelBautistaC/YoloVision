@@ -1,23 +1,7 @@
-"""
-URL configuration for webapp project.
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path
-from main.views import login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso2,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas
-
+from main.views import login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso2,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas,supervisar_camara,stream_supervisar_camara,obtener_info_mesas_uuid
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', login_view, name='login'),
@@ -41,5 +25,11 @@ urlpatterns = [
     path('configuracion/obtener_info_mesas/',obtener_info_mesas, name='obtener_info_mesas'),
     path('configuracion/iniciar-tracking/', iniciar_tracking, name='iniciar_tracking'),
     path('configuracion/detectar-mesas/', detectar_mesas, name='detectar_mesas'),
+    path('monitoreo/supervisar-camara/<uuid:camera_uuid>/', supervisar_camara, name='supervisar_camara'),
+    path('monitoreo/stream-supervisar-camara/<uuid:camera_uuid>/', stream_supervisar_camara, name='stream_supervisar_camara'),
+    path('monitoreo/obtener_info_mesas/<uuid:camera_uuid>/', obtener_info_mesas_uuid, name='obtener_info_mesas_uuid'),
+
+
+
 
 ]
