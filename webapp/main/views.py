@@ -14,7 +14,7 @@ from ultralytics import YOLO
 import base64
 import math
 from firebase_admin import db
-from .firebase_helpers import get_camera_by_ip, save_camera_data,get_camera_by_uuid
+from .firebase_helpers import get_camera_by_ip, save_camera_data,get_camera_by_uuid,save_camera_data2
 from .tasks import start_detection_task
 from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
 
@@ -145,11 +145,13 @@ def iniciar_tracking(request):
         data = json.loads(request.body)
         polygons = data.get('polygons', [])
         camera_data = request.session.get('camera_data')
+        
         if not camera_data:
             return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
 
         ip_url = camera_data['ip_url']
-        # Retrieve or create camera in Firebase
+        
+        # Obtener o crear el UUID de la cámara
         camera_uuid, existing_camera_data = get_camera_by_ip(ip_url)
         if not camera_uuid:
             camera_uuid = str(uuid.uuid4())
@@ -157,19 +159,24 @@ def iniciar_tracking(request):
         else:
             camera_data = existing_camera_data
 
-        # Update camera data with polygons
+        # Actualizar los datos de la cámara con los polígonos
         camera_data['mesas'] = polygons
-        # Optionally, add detection settings
-        camera_data['detection_interval'] = data.get('detection_interval', 5)  # in seconds
+        camera_data['detection_interval'] = data.get('detection_interval', 5)  # Intervalo de detección en segundos
 
-        # Save to Firebase
-        save_camera_data(camera_uuid, camera_data)
+        # Usar el ambiente y piso almacenado en la sesión
+        ambiente_nombre = request.session.get('ambiente')
+        piso = request.session.get('piso')
 
-        # Start the detection task
+        # Guardar en Firebase
+        save_camera_data2(ambiente_nombre, piso, camera_uuid, camera_data)
+
+        # Iniciar la tarea de detección
         start_detection_task.delay(camera_uuid)
 
         return JsonResponse({'success': True, 'camera_uuid': camera_uuid})
+
     return JsonResponse({'error': 'Método no permitido'})
+
 
 
 
@@ -899,8 +906,11 @@ def update_camera_data(ambiente, piso, camera_data):
 #Seccion supervisar camara:
 
 def supervisar_camara(request, camera_uuid):
+    logger.info(f"Buscando cámara con UUID: {camera_uuid}")
+    
     camera_data = get_camera_by_uuid(camera_uuid)
     if not camera_data:
+        logger.error(f"Cámara con UUID {camera_uuid} no encontrada")
         return HttpResponse("Cámara no encontrada", status=404)
 
     context = {
@@ -909,8 +919,8 @@ def supervisar_camara(request, camera_uuid):
         'piso': camera_data.get('piso'),
         'camera_uuid': camera_uuid,
     }
+    logger.info(f"Cámara encontrada: {camera_data}")
     return render(request, 'supervisar_camara.html', context)
-
 
 
 def stream_supervisar_camara(request, camera_uuid):
