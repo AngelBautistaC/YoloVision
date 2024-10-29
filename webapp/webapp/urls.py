@@ -1,11 +1,13 @@
 
 from django.contrib import admin
 from django.urls import path
-from main.views import login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso2,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas,supervisar_camara,stream_supervisar_camara,obtener_info_mesas_uuid
+from main.views import crear_form_view,crear_view,login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso2,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas,supervisar_camara,stream_supervisar_camara,obtener_info_mesas_uuid
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', login_view, name='login'),
     path('monitoreo/', monitoring_view, name='monitoreo'),
+    path('crear/', crear_view, name='crear'),
+    path('crear_form/', crear_form_view, name='crear_form'),
     path('configuracion/', configuracion_view, name='configuracion'),
     path('logout/', login_view, name='logout'),
     #path('configuracion/calibrar/',calibrar_camara, name='calibrar_camara'),

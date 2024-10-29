@@ -18,10 +18,27 @@ from .firebase_helpers import get_camera_by_ip, save_camera_data,get_camera_by_u
 from .tasks import start_detection_task
 from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
 
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from .forms import CreateUserForm
+from .firebase_helpers import create_user_in_firebase  # Function to handle Firebase user creation
+
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from .forms import LoginForm
+from .firebase_helpers import authenticate_firebase_user, save_user_to_firebase
+# main/views.py
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
 
 logger = logging.getLogger(__name__)
 
 
+
+
+@login_required
+def admin_dashboard(request):
+    return render(request, 'admin_dashboard.html')
 
 
 
@@ -538,15 +555,77 @@ JSON_FILE_PATH = os.path.join(settings.BASE_DIR, 'data', 'database.json')
 
 def login_view(request):
     if request.method == 'POST':
-        # Aquí iría la lógica de autenticación en el futuro
-        return redirect('monitoreo')
-    return render(request, 'login.html')
+        form = LoginForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            password = form.cleaned_data['password']
+            user, role = authenticate_firebase_user(email, password)
+            if user:
+                # Set session variables
+                request.session['user_id'] = user.uid
+                request.session['user_role'] = role
+                return redirect('monitoreo')  # Change 'dashboard' to the appropriate URL for your admin view
+            else:
+                messages.error(request, 'Invalid credentials. Please try again.')
+    else:
+        form = LoginForm()
 
+    return render(request, 'login.html', {'form': form})
 def monitoring_view(request):
     return render(request, 'monitoreo.html')
 
 def configuracion_view(request):
     return render(request, 'configuracion.html')
+
+def crear_view(request):
+    
+    if request.method == 'POST':
+        form = CreateUserForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data['username']
+            email = form.cleaned_data['email']
+            password = form.cleaned_data['password']
+            role = form.cleaned_data['role']
+
+            # Create user in Firebase and save additional data
+            user_id = create_user_in_firebase(username, email, password, role)
+            if user_id:
+                messages.success(request, f'User {username} created successfully!')
+                return redirect('monitoring_view')
+            else:
+                messages.error(request, 'There was an error creating the user.')
+    else:
+        form = CreateUserForm()
+
+    return render(request, 'crear.html', {'form': form})
+    
+# views.py
+from django.shortcuts import render, redirect
+from django.contrib import messages
+
+def crear_form_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        role = request.POST.get('role')
+        
+        print("Attempting to create user in Firebase...")
+        
+        user_id = create_user_in_firebase(username, email, password, role)
+        
+        if user_id:
+            print("User created successfully.")
+            # Display a success message or render a success template
+            messages.success(request, "User created successfully.")
+        else:
+            print("User creation failed.")
+            # Display an error message or handle failure
+            messages.error(request, "Failed to create user.")
+        
+        return redirect('crear_form')  # Modify with the actual name of your URL if different
+
+    return render(request, 'crear.html')
 
 
 
