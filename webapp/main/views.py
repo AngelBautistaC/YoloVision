@@ -27,19 +27,38 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from .forms import LoginForm
 from .firebase_helpers import authenticate_firebase_user, save_user_to_firebase
-# main/views.py
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
 
 logger = logging.getLogger(__name__)
 
 
 
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect
+# views.py
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
 
 @login_required
 def admin_dashboard(request):
-    return render(request, 'admin_dashboard.html')
 
+    return render(request, 'admin_dashboard.html')
+   
+
+@login_required
+def operator_dashboard(request):
+    
+    return render(request, 'operator_dashboard.html')
+    
+
+@login_required
+def user_dashboard(request):
+    return render(request, 'user_dashboard.html')
+
+# views.py
+
+def access_denied(request):
+    return render(request, 'access_denied.html')
 
 
 def configurar_deteccion(request):
@@ -548,7 +567,8 @@ def quitar_poligono(request):
 import json
 import os
 from django.conf import settings
-
+from django.contrib.auth import login
+from django.contrib.auth.models import User
 
 JSON_FILE_PATH = os.path.join(settings.BASE_DIR, 'data', 'database.json')
 #----------------------------------------------------------------------------------------------------------------------------------------
@@ -560,25 +580,51 @@ def login_view(request):
             email = form.cleaned_data['email']
             password = form.cleaned_data['password']
             user, role = authenticate_firebase_user(email, password)
+            
             if user:
-                # Set session variables
-                request.session['user_id'] = user.uid
-                request.session['user_role'] = role
-                return redirect('monitoreo')  # Change 'dashboard' to the appropriate URL for your admin view
+                # Set session data and create Django User instance if it doesn't exist
+                django_user, created = User.objects.get_or_create(username=user.uid)
+                django_user.is_staff = role == 'admin'  # Optional: set as staff if admin
+                django_user.save()
+
+                # Log in the user to establish session
+                login(request, django_user)
+
+                # Redirect based on role
+                if role == 'operator':
+                    return redirect('operator_dashboard')
+                elif role == 'user':
+                    return redirect('user_dashboard')
+                elif role == 'administrator':
+                    return redirect('admin_dashboard')
             else:
                 messages.error(request, 'Invalid credentials. Please try again.')
     else:
         form = LoginForm()
 
     return render(request, 'login.html', {'form': form})
+@login_required
 def monitoring_view(request):
     return render(request, 'monitoreo.html')
-
+@login_required
 def configuracion_view(request):
-    return render(request, 'configuracion.html')
+    # Verifica si el rol del usuario está almacenado en la sesión
+    user_role = request.session.get('user_role')
 
+    # Solo permite el acceso si el rol es 'operator' o 'administrator'
+    if user_role not in ['operator', 'administrator']:
+        return redirect('access_denied')  # Redirige a una vista de acceso denegado
+
+    return render(request, 'configuracion.html')
+@login_required
 def crear_view(request):
-    
+    # Verifica si el rol del usuario está almacenado en la sesión
+    user_role = request.session.get('user_role')
+
+    # Solo permite el acceso si el rol es 'operator' o 'administrator'
+    if user_role not in ['operator', 'administrator']:
+        return redirect('access_denied')  # Redirige a una vista de acceso denegado
+
     if request.method == 'POST':
         form = CreateUserForm(request.POST)
         if form.is_valid():
@@ -604,6 +650,13 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 
 def crear_form_view(request):
+    # Verifica si el rol del usuario está almacenado en la sesión
+    user_role = request.session.get('user_role')
+
+    # Solo permite el acceso si el rol es 'operator' o 'administrator'
+    if user_role not in ['operator', 'administrator']:
+        return redirect('access_denied')  # Redirige a una vista de acceso denegado
+
     if request.method == 'POST':
         username = request.POST.get('username')
         email = request.POST.get('email')

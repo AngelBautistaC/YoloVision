@@ -143,9 +143,14 @@ def authenticate_firebase_user(email, password):
             return None, None
         
         # Assuming role is retrieved from Firebase's custom claims, or you can store it in Firestore
-        user_id = response_data["localId"]
-        role = "user"  # Or pull this from Firestore if stored there
-        return user_id, role
+        user = auth.get_user_by_email(email)
+        firestore_client = firestore.client()
+        user_data = firestore_client.collection('users').document(user.uid).get()
+        
+        if user_data.exists:
+            role = user_data.to_dict().get('role', 'user')  # Default to 'user' if no role
+            return user, role
+        return None, None
 
     except requests.RequestException as e:
         print(f"Request error: {e}")
