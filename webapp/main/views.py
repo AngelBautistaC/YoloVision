@@ -1116,37 +1116,51 @@ def obtener_info_mesas_uuid(request, camera_uuid):
     polygons = camera.get('mesas', [])
 
     return JsonResponse({'mesas': polygons})
+from collections import defaultdict
+
 
 
 def obtener_datos_monitoreo():
     ambientes_ref = db.reference('/ambientes')
     ambientes_data = ambientes_ref.get()
     datos_monitoreo = []
+    resumen_ambientes = defaultdict(lambda: {'personas_detectadas': 0, 'max_personas': 0, 'asientos_disponibles': 0})
 
-    if isinstance(ambientes_data, dict):  # Verificar que 'ambientes_data' es un diccionario
+    if isinstance(ambientes_data, dict):
         for ambiente_nombre, ambiente_data in ambientes_data.items():
             pisos = ambiente_data.get('piso', {})
-            if isinstance(pisos, dict):  # Verificar que 'pisos' es un diccionario
+            if isinstance(pisos, dict):
                 for piso, piso_data in pisos.items():
                     camaras = piso_data.get('camara', {})
-                    if isinstance(camaras, dict):  # Verificar que 'camaras' es un diccionario
+                    if isinstance(camaras, dict):
                         for cam_uuid, cam_data in camaras.items():
                             cam_label = cam_data.get('label', 'Sin etiqueta')
                             mesas = cam_data.get('mesas', [])
-                            if isinstance(mesas, list):  # Verificar que 'mesas' es una lista
+                            if isinstance(mesas, list):
                                 for mesa in mesas:
+                                    personas_detectadas = mesa.get("personas_Detectadas", 0)
+                                    max_personas = mesa.get("max_personas", 0)
+                                    asientos_disponibles = max_personas - personas_detectadas
+
                                     mesa_info = {
                                         "ambiente": ambiente_nombre,
                                         "piso": piso,
                                         "camara": cam_label,
                                         "mesa_id": mesa.get("id", "N/A"),
-                                        "max_personas": mesa.get("max_personas", "N/A"),
-                                        "personas_detectadas": mesa.get("personas_Detectadas", "N/A"),
+                                        "max_personas": max_personas,
+                                        "personas_detectadas": personas_detectadas,
+                                        "asientos_disponibles": asientos_disponibles,
                                     }
                                     datos_monitoreo.append(mesa_info)
-    return datos_monitoreo
+
+                                    # Agregar al resumen
+                                    resumen_ambientes[ambiente_nombre]['personas_detectadas'] += personas_detectadas
+                                    resumen_ambientes[ambiente_nombre]['max_personas'] += max_personas
+                                    resumen_ambientes[ambiente_nombre]['asientos_disponibles'] += asientos_disponibles
+
+    return datos_monitoreo, dict(resumen_ambientes)
 
 @login_required
 def monitoring_view(request):
-    datos_monitoreo = obtener_datos_monitoreo()
-    return render(request, 'monitoreo.html', {'datos_monitoreo': datos_monitoreo})
+    datos_monitoreo, resumen_ambientes = obtener_datos_monitoreo()  # Llamar a la función correcta
+    return render(request, 'monitoreo.html', {'datos_monitoreo': datos_monitoreo, 'resumen_ambientes': resumen_ambientes})
