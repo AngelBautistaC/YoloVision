@@ -13,7 +13,6 @@ from shapely.geometry.point import Point
 from ultralytics import YOLO
 import base64
 import math
-from firebase_admin import db
 from .firebase_helpers import get_camera_by_ip, save_camera_data,get_camera_by_uuid,save_camera_data2
 from .tasks import start_detection_task
 from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
@@ -30,7 +29,7 @@ from .firebase_helpers import authenticate_firebase_user, save_user_to_firebase
 
 logger = logging.getLogger(__name__)
 
-
+from firebase_admin import credentials, db
 
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
@@ -603,9 +602,7 @@ def login_view(request):
         form = LoginForm()
 
     return render(request, 'login.html', {'form': form})
-@login_required
-def monitoring_view(request):
-    return render(request, 'monitoreo.html')
+
 @login_required
 def configuracion_view(request):
     # Verifica si el rol del usuario está almacenado en la sesión
@@ -1121,7 +1118,35 @@ def obtener_info_mesas_uuid(request, camera_uuid):
     return JsonResponse({'mesas': polygons})
 
 
+def obtener_datos_monitoreo():
+    ambientes_ref = db.reference('/ambientes')
+    ambientes_data = ambientes_ref.get()
+    datos_monitoreo = []
 
+    if isinstance(ambientes_data, dict):  # Verificar que 'ambientes_data' es un diccionario
+        for ambiente_nombre, ambiente_data in ambientes_data.items():
+            pisos = ambiente_data.get('piso', {})
+            if isinstance(pisos, dict):  # Verificar que 'pisos' es un diccionario
+                for piso, piso_data in pisos.items():
+                    camaras = piso_data.get('camara', {})
+                    if isinstance(camaras, dict):  # Verificar que 'camaras' es un diccionario
+                        for cam_uuid, cam_data in camaras.items():
+                            cam_label = cam_data.get('label', 'Sin etiqueta')
+                            mesas = cam_data.get('mesas', [])
+                            if isinstance(mesas, list):  # Verificar que 'mesas' es una lista
+                                for mesa in mesas:
+                                    mesa_info = {
+                                        "ambiente": ambiente_nombre,
+                                        "piso": piso,
+                                        "camara": cam_label,
+                                        "mesa_id": mesa.get("id", "N/A"),
+                                        "max_personas": mesa.get("max_personas", "N/A"),
+                                        "personas_detectadas": mesa.get("personas_Detectadas", "N/A"),
+                                    }
+                                    datos_monitoreo.append(mesa_info)
+    return datos_monitoreo
 
-
-
+@login_required
+def monitoring_view(request):
+    datos_monitoreo = obtener_datos_monitoreo()
+    return render(request, 'monitoreo.html', {'datos_monitoreo': datos_monitoreo})
