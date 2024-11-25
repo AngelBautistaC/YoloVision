@@ -116,13 +116,13 @@
     
         if (continueBtn) {
         continueBtn.addEventListener('click', function() {
-            window.location.href = '{% url "calibrar_camara_paso2" %}';  // Cambiar esta URL
+            window.location.href = '{% url "calibrar_camara_paso3" %}';  // Cambiar esta URL
         });
     }
 });
     </script>
 
-    {% elif step == '2' %}
+    <!-- {% elif step == '2' %}
     <h3>Paso 2: Obtención de matriz de distorsión</h3>
     <p id="capture-instructions">Capture al menos 10 imágenes antes de calibrar.</p>
     <div class="row">
@@ -234,7 +234,7 @@
     });
 
     
-    </script>
+    </script> -->
 
 {% elif step == '3' %}
 <h3>Paso 3: Obtención de pixels por metro</h3>
