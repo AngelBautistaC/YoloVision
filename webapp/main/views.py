@@ -572,6 +572,38 @@ from django.contrib.auth.models import User
 JSON_FILE_PATH = os.path.join(settings.BASE_DIR, 'data', 'database.json')
 #----------------------------------------------------------------------------------------------------------------------------------------
 
+# def login_view(request):
+#     if request.method == 'POST':
+#         form = LoginForm(request.POST)
+#         if form.is_valid():
+#             email = form.cleaned_data['email']
+#             password = form.cleaned_data['password']
+#             user, role = authenticate_firebase_user(email, password)
+#             print(user,role)
+            
+#             if user:
+#                 # Set session data and create Django User instance if it doesn't exist
+#                 django_user, created = User.objects.get_or_create(username=user.uid)
+#                 django_user.is_staff = role == 'admin'  # Optional: set as staff if admin
+#                 django_user.save()
+
+#                 # Log in the user to establish session
+#                 login(request, django_user)
+
+#                 # Redirect based on role
+#                 if role == 'operator':
+#                     return redirect('operator_dashboard')
+#                 elif role == 'user':
+#                     return redirect('user_dashboard')
+#                 elif role == 'administrator':
+#                     return redirect('admin_dashboard')
+#             else:
+#                 messages.error(request, 'Invalid credentials. Please try again.')
+#     else:
+#         form = LoginForm()
+
+#     return render(request, 'login.html', {'form': form})
+
 def login_view(request):
     if request.method == 'POST':
         form = LoginForm(request.POST)
@@ -579,15 +611,18 @@ def login_view(request):
             email = form.cleaned_data['email']
             password = form.cleaned_data['password']
             user, role = authenticate_firebase_user(email, password)
-            
+
             if user:
                 # Set session data and create Django User instance if it doesn't exist
                 django_user, created = User.objects.get_or_create(username=user.uid)
-                django_user.is_staff = role == 'admin'  # Optional: set as staff if admin
+                django_user.is_staff = role == 'administrator'  # Corrected role check
                 django_user.save()
 
                 # Log in the user to establish session
                 login(request, django_user)
+
+                # Store the user's role in the session
+                request.session['user_role'] = role
 
                 # Redirect based on role
                 if role == 'operator':
@@ -603,10 +638,13 @@ def login_view(request):
 
     return render(request, 'login.html', {'form': form})
 
+
+
 @login_required
 def configuracion_view(request):
     # Verifica si el rol del usuario está almacenado en la sesión
     user_role = request.session.get('user_role')
+    print(user_role)
 
     # Solo permite el acceso si el rol es 'operator' o 'administrator'
     if user_role not in ['operator', 'administrator']:
