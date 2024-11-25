@@ -1,0 +1,24 @@
+<!-- templates/user_dashboard.html -->
+{% extends 'base_user.html' %}
+{% load static %}
+
+{% block page_title %}User Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Welcome, {{ request.user.first_name }}</h2>
+    <p>View recent activities and summary of monitored areas.</p>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Your Recent Activities</h5>
+                    <p class="card-text">Review your recent interactions with the monitored areas.</p>
+                    <a href="{% url 'login' %}" class="btn btn-primary">View Activities</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

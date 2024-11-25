@@ -25,3 +25,17 @@ class CalibrationMiddleware:
                 del request.session[key]
 
         return response
+
+
+# Example of adding an is_admin attribute in a custom middleware
+class RoleMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.user.is_authenticated:
+            # Assuming role is stored in Firebase Realtime Database under /users/<uid>/role
+            user_ref = db.reference(f'/users/{request.user.username}/role')
+            role = user_ref.get()
+            request.user.is_admin = (role == 'admin')
+        return self.get_response(request)

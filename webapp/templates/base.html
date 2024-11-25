@@ -156,11 +156,14 @@
     <li class="{% if request.path == '/configuracion/' %}active{% endif %}">
         <a href="/configuracion"><i class="active"></i> Configuración</a>
     </li>
+    <li class="{% if request.path == '/crear/' %}active{% endif %}">
+        <a href="/crear"><i class="active"></i> Crear Usuarios</a>
+    </li>
     <li class="{% if request.path == '/ayuda/' %}active{% endif %}">
         <a href="/ayuda"><i class="active"></i> Ayuda</a>
     </li>
     <li class="{% if request.path == '/logout/' %}active{% endif %}">
-        <a href="/logout"><i class="active"></i> Salir</a>
+        <a href="/logout"><i class="active"></i> Cerrar Sesión</a>
     </li>
 </ul>
         </div>

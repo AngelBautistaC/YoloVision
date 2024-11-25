@@ -1,0 +1,33 @@
+<!-- templates/operator_dashboard.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}Operator Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Welcome, Operator</h2>
+    <p>Here you can monitor live streams, manage detections, and check system alerts.</p>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Live Monitoring</h5>
+                    <p class="card-text">Monitor live camera streams and active detections.</p>
+                    <a href="{% url 'monitoreo' %}" class="btn btn-primary">Monitor Cameras</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">System Alerts</h5>
+                    <p class="card-text">View and address active system alerts and notifications.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

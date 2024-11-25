@@ -12,6 +12,10 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 
+# settings.py
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'  # Or your desired landing page after login
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -146,3 +150,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Celery settings
 CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Use the appropriate Redis URL
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
+
+# settings.py
+
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Store sessions in the database
+SESSION_COOKIE_AGE = 1209600  # Set cookie expiry, e.g., two weeks
+SESSION_SAVE_EVERY_REQUEST = True  # Save session data on every request

@@ -1,17 +1,18 @@
 import os
 import firebase_admin
-from firebase_admin import credentials, db
+from firebase_admin import credentials, firestore, auth, db
+import os
 
-# Obtener la ruta de la carpeta donde se encuentra firebase_config.py
+# Obtén la ruta del archivo JSON del SDK de administrador de Firebase
 base_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Combinar la ruta de la carpeta con el nombre del archivo JSON
 json_path = os.path.join(base_dir, "visionpucp-53816-firebase-adminsdk-4uyge-819a9c7e7c.json")
 
-# Cargar las credenciales usando la ruta relativa
-cred = credentials.Certificate(json_path)
+# Inicializa la aplicación de Firebase si aún no está inicializada
+if not firebase_admin._apps:
+    cred = credentials.Certificate(json_path)
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://visionpucp-53816-default-rtdb.firebaseio.com'  # Asegúrate de que la URL sea correcta
+    })
 
-# Inicializar la app de Firebase con la URL de la base de datos
-firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://visionpucp-53816-default-rtdb.firebaseio.com'
-})
+# Inicializa Firestore y Realtime Database
+firestore_db = firestore.client()

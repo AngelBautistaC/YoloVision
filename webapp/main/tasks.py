@@ -1,4 +1,3 @@
-# tasks.py
 from celery import shared_task
 from .firebase_helpers import get_camera_by_uuid, save_camera_data
 import cv2
@@ -6,8 +5,7 @@ import time
 import numpy as np
 from ultralytics import YOLO
 from shapely.geometry import Point
-from .utils import expand_polygon,initialize_tracking,initialize_counting_regions,track_and_count
-
+from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
 
 @shared_task
 def start_detection_task(camera_uuid):
@@ -59,7 +57,9 @@ def start_detection_task(camera_uuid):
 
         # Save updated counts to Firebase
         camera_data['mesas'] = [td['polygon'] for td in tracking_data_list]
-        save_camera_data(camera_uuid, camera_data)
+        ambiente_nombre = camera_data['ambiente']
+        piso = camera_data['piso']
+        save_camera_data(ambiente_nombre, piso, camera_uuid, camera_data)
 
         time.sleep(detection_interval)  # Wait before next detection cycle
 
