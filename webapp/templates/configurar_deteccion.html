@@ -2,6 +2,13 @@
 {% load static %}
 
 {% block content %}
+<script>
+    // Limpiar el indicador al iniciar el flujo
+    sessionStorage.removeItem('detection_configuration_incomplete');
+</script>
+
+
+
 <div class="container mt-5">
     <h2>Configurar Detección de Mesas</h2>
     <div class="row">
@@ -440,4 +447,25 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+
+
+<script>
+    window.addEventListener('beforeunload', function (e) {
+        e.preventDefault();
+        e.returnValue = 'Si sales ahora, perderás el progreso de la configuración.';
+    });
+
+    window.addEventListener('unload', function (e) {
+        sessionStorage.setItem('detection_configuration_incomplete', 'true');
+    });
+
+    window.addEventListener('load', function (e) {
+        if (sessionStorage.getItem('detection_configuration_incomplete') === 'true') {
+            sessionStorage.removeItem('detection_configuration_incomplete');
+            window.location.href = '{% url "configuracion" %}';
+        }
+    });
+</script>
+
 {% endblock %}

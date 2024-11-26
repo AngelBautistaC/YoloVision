@@ -32,19 +32,46 @@ logger = logging.getLogger(__name__)
 from firebase_admin import credentials, db
 
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect
-# views.py
+from django.shortcuts import redirect,render
 
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
+import json
+import os
+from django.conf import settings
+from django.contrib.auth import login
+from django.contrib.auth.models import User
+
+
+
+from functools import wraps
+from django.shortcuts import redirect
+from django.conf import settings
+
+def role_required(allowed_roles=[]):
+    """
+    Decorador para vistas que verifica si el usuario tiene uno de los roles permitidos.
+    Si no es así, redirige a la página de acceso denegado.
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def _wrapped_view(request, *args, **kwargs):
+            user_role = request.session.get('user_role')
+            if user_role in allowed_roles:
+                return view_func(request, *args, **kwargs)
+            else:
+                return redirect('access_denied')
+        return _wrapped_view
+    return decorator
+
 
 @login_required
+@role_required(allowed_roles=['administrator'])
 def admin_dashboard(request):
 
     return render(request, 'admin_dashboard.html')
    
 
 @login_required
+@role_required(allowed_roles=['operator'])
 def operator_dashboard(request):
     
     return render(request, 'operator_dashboard.html')
@@ -554,55 +581,7 @@ def quitar_poligono(request):
 
     return JsonResponse({'error': 'Método no permitido'})
 
-
-
-#----------------------------------------------------------------------------------------------------------------------------------------
-
-
-
-
-####SECCION BASE DE DATOS JSON : CAMBIAR A BASE DE DATOS FIREBASE:
-#----------------------------------------------------------------------------------------------------------------------------------------
-import json
-import os
-from django.conf import settings
-from django.contrib.auth import login
-from django.contrib.auth.models import User
-
 JSON_FILE_PATH = os.path.join(settings.BASE_DIR, 'data', 'database.json')
-#----------------------------------------------------------------------------------------------------------------------------------------
-
-# def login_view(request):
-#     if request.method == 'POST':
-#         form = LoginForm(request.POST)
-#         if form.is_valid():
-#             email = form.cleaned_data['email']
-#             password = form.cleaned_data['password']
-#             user, role = authenticate_firebase_user(email, password)
-#             print(user,role)
-            
-#             if user:
-#                 # Set session data and create Django User instance if it doesn't exist
-#                 django_user, created = User.objects.get_or_create(username=user.uid)
-#                 django_user.is_staff = role == 'admin'  # Optional: set as staff if admin
-#                 django_user.save()
-
-#                 # Log in the user to establish session
-#                 login(request, django_user)
-
-#                 # Redirect based on role
-#                 if role == 'operator':
-#                     return redirect('operator_dashboard')
-#                 elif role == 'user':
-#                     return redirect('user_dashboard')
-#                 elif role == 'administrator':
-#                     return redirect('admin_dashboard')
-#             else:
-#                 messages.error(request, 'Invalid credentials. Please try again.')
-#     else:
-#         form = LoginForm()
-
-#     return render(request, 'login.html', {'form': form})
 
 def login_view(request):
     if request.method == 'POST':
@@ -641,16 +620,20 @@ def login_view(request):
 
 
 @login_required
+@role_required(allowed_roles=['operator', 'administrator'])
 def configuracion_view(request):
-    # Verifica si el rol del usuario está almacenado en la sesión
-    user_role = request.session.get('user_role')
-    print(user_role)
-
-    # Solo permite el acceso si el rol es 'operator' o 'administrator'
-    if user_role not in ['operator', 'administrator']:
-        return redirect('access_denied')  # Redirige a una vista de acceso denegado
-
+    # Limpiar datos de calibración previos
+    calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints',
+                        'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter',
+                        'camera_data', 'detections', 'manual_polygons', 'tracking_active']
+    for key in calibration_keys:
+        if key in request.session:
+            del request.session[key]
     return render(request, 'configuracion.html')
+
+
+
+
 @login_required
 def crear_view(request):
     # Verifica si el rol del usuario está almacenado en la sesión
@@ -721,6 +704,11 @@ def crear_form_view(request):
 logger = logging.getLogger(__name__)
 
 def calibrar_camara_paso1(request):
+        # Limpiar datos de calibración previos
+    calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
+    for key in calibration_keys:
+        if key in request.session:
+            del request.session[key]
     context = {'step': '1', 'camera_connected': False}
 
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -747,6 +735,7 @@ def calibrar_camara_paso1(request):
                     break
 
             cap.release()
+            frame = cv2.resize(frame, (640, 480))
 
             if frame_read:
                 # Save necessary data in session
@@ -776,127 +765,18 @@ def calibrar_camara_paso1(request):
     return render(request, 'calibrar_camara.html', context)
 
 
-
-# def calibrar_camara_paso2(request):
-#     context = {'step': '2'}
-#     ip_port = request.session.get('ip_port')
-#     context['ip_port'] = ip_port
-
-#     # Definir las dimensiones del tablero de ajedrez
-#     CHECKERBOARD = (6, 9)
-#     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-
-#     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-#         action = request.POST.get('action')
-#         logger.info(f"Paso 2 - Acción: {action}, URL del stream: {ip_port}")
-
-#         if not ip_port:
-#             logger.error("La URL del stream no está disponible en la sesión")
-#             return JsonResponse({'success': False, 'message': 'La URL del stream no está disponible. Por favor, vuelve al paso 1.'})
-
-#         if action == 'capture':
-#             try:
-#                 cap = cv2.VideoCapture(ip_port)
-#                 if not cap.isOpened():
-#                     logger.error(f"No se pudo abrir el stream para captura: {ip_port}")
-#                     return JsonResponse({'success': False, 'message': 'No se pudo abrir el stream de la cámara.'})
-
-#                 ret, frame = cap.read()
-#                 cap.release()
-
-#                 if not ret or frame is None:
-#                     logger.error("No se pudo capturar la imagen")
-#                     return JsonResponse({'success': False, 'message': 'No se pudo capturar la imagen'})
-
-#                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-#                 ret, corners = cv2.findChessboardCorners(gray, CHECKERBOARD, 
-#                                                          cv2.CALIB_CB_ADAPTIVE_THRESH + 
-#                                                          cv2.CALIB_CB_FAST_CHECK + 
-#                                                          cv2.CALIB_CB_NORMALIZE_IMAGE)
-#                 if ret:
-#                     objp = np.zeros((1, CHECKERBOARD[0] * CHECKERBOARD[1], 3), np.float32)
-#                     objp[0,:,:2] = np.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2)
-                    
-#                     corners2 = cv2.cornerSubPix(gray, corners, (11,11), (-1,-1), criteria)
-                    
-#                     objpoints = request.session.get('objpoints', [])
-#                     imgpoints = request.session.get('imgpoints', [])
-                    
-#                     objpoints.append(objp.tolist())  # Convertir a lista para serialización
-#                     imgpoints.append(corners2.tolist())  # Convertir a lista para serialización
-                    
-#                     request.session['objpoints'] = objpoints
-#                     request.session['imgpoints'] = imgpoints
-                    
-#                     logger.info(f"Captura exitosa. Total de capturas: {len(objpoints)}")
-#                     return JsonResponse({'success': True, 'captures': len(objpoints)})
-#                 else:
-#                     logger.warning("No se detectó el patrón del tablero")
-#                     return JsonResponse({'success': False, 'message': 'No se detectó el patrón del tablero'})
-#             except Exception as e:
-#                 logger.exception(f"Error al capturar: {str(e)}")
-#                 return JsonResponse({'success': False, 'message': f'Error al capturar: {str(e)}'})
-
-#         elif action == 'calibrate':
-#             objpoints = request.session.get('objpoints', [])
-#             imgpoints = request.session.get('imgpoints', [])
-            
-#             if len(objpoints) < 10:
-#                 return JsonResponse({'success': False, 'message': 'Se necesitan al menos 10 capturas'})
-            
-#             try:
-#                 cap = cv2.VideoCapture(ip_port)
-#                 if not cap.isOpened():
-#                     return JsonResponse({'success': False, 'message': 'No se pudo abrir el stream de la cámara para calibrar.'})
-
-#                 ret, frame = cap.read()
-#                 cap.release()
-
-#                 if not ret or frame is None:
-#                     return JsonResponse({'success': False, 'message': 'No se pudo capturar la imagen para calibrar'})
-
-#                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                
-#                 # Convertir las listas almacenadas de vuelta a numpy arrays
-#                 objpoints = [np.array(pts, dtype=np.float32) for pts in objpoints]
-#                 imgpoints = [np.array(pts, dtype=np.float32) for pts in imgpoints]
-                
-#                 ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
-                
-#                 if ret:
-#                     camera_data = {
-#                         "ip_url": ip_port,
-#                         "label": request.session.get('camera_name'),
-#                         "cam_matrix": mtx.tolist(),
-#                         "dist_coeff": dist.tolist(),
-#                     }
-#                     ambiente = request.session.get('ambiente')
-#                     piso = request.session.get('piso')
-                    
-#                     if not ambiente or not piso:
-#                         return JsonResponse({'success': False, 'message': 'Falta información del ambiente o piso'})
-                    
-#                     update_camera_data(ambiente, piso, camera_data)
-                    
-#                     return JsonResponse({
-#                         'success': True,
-#                         'camera_matrix': mtx.tolist(),
-#                         'dist_coeffs': dist.tolist()
-#                     })
-#                 else:
-#                     return JsonResponse({'success': False, 'message': 'La calibración falló'})
-#             except Exception as e:
-#                 logger.exception(f"Error al calibrar: {str(e)}")
-#                 return JsonResponse({'success': False, 'message': f'Error al calibrar: {str(e)}'})
-
-#     return render(request, 'calibrar_camara.html', context)
-
-
+@login_required
+@role_required(allowed_roles=['operator', 'administrator'])
 def calibrar_camara_paso3(request):
+
     context = {'step': '3'}
     ip_port = request.session.get('ip_port')
     context['ip_port'] = ip_port
 
+    # Verificar si se ha completado el paso 1
+    if not request.session.get('ip_port'):
+        return redirect('calibrar_camara_paso1')
+    
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_50)
     aruco_params = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
@@ -918,7 +798,9 @@ def calibrar_camara_paso3(request):
 
                 if not ret or frame is None:
                     return JsonResponse({'success': False, 'message': 'No se pudo capturar la imagen'})
-
+                
+                # Redimensionar el frame a 640x480
+                frame = cv2.resize(frame, (640, 480))
                 corners, ids, _ = detector.detectMarkers(frame)
                 if ids is not None:
                     marker_width_px = np.linalg.norm(corners[0][0][1] - corners[0][0][0])
@@ -997,6 +879,9 @@ def gen_frames(camera_url):
             print("No se pudo leer el frame del stream.")
             break
 
+        # Redimensionar el frame a 640x480
+        frame = cv2.resize(frame, (640, 480))
+
         # Opcional: Aquí puedes agregar cualquier procesamiento de imagen que necesites
 
         ret, buffer = cv2.imencode('.jpg', frame)
@@ -1029,7 +914,14 @@ def camera_stream(request):
     return StreamingHttpResponse(gen_frames(ip_port),
                                  content_type='multipart/x-mixed-replace; boundary=frame')
 
+
+@login_required
+@role_required(allowed_roles=['operator', 'administrator'])
 def calibrar_camara_paso_final(request):
+    # Verificar si se ha completado el paso 3
+    if not request.session.get('pixels_per_meter'):
+        return redirect('calibrar_camara_paso1')
+
     context = {
         'step': 'final',
         'camera_name': request.session.get('camera_name', ''),
@@ -1037,6 +929,12 @@ def calibrar_camara_paso_final(request):
         'piso': request.session.get('piso', ''),
         'pixels_per_meter': request.session.get('pixels_per_meter', ''),
     }
+    
+        # Limpiar datos de calibración
+    calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
+    for key in calibration_keys:
+        if key in request.session:
+            del request.session[key]
     return render(request, 'calibrar_camara.html', context)
 
 def load_json_data():
@@ -1079,25 +977,6 @@ def update_camera_data(ambiente, piso, camera_data):
         data["ambientes"].append(new_ambiente)
     save_json_data(data)
 
-
-#Seccion supervisar camara:
-
-# def supervisar_camara(request, camera_uuid):
-#     logger.info(f"Buscando cámara con UUID: {camera_uuid}")
-    
-#     camera_data = get_camera_by_uuid(camera_uuid)
-#     if not camera_data:
-#         logger.error(f"Cámara con UUID {camera_uuid} no encontrada")
-#         return HttpResponse("Cámara no encontrada", status=404)
-
-#     context = {
-#         'camera': camera_data,
-#         'ambiente': camera_data.get('ambiente'),
-#         'piso': camera_data.get('piso'),
-#         'camera_uuid': camera_uuid,
-#     }
-#     logger.info(f"Cámara encontrada: {camera_data}")
-#     return render(request, 'supervisar_camara.html', context)
 
 def supervisar_camara(request, camera_uuid):
     logger.info(f"Buscando cámara con UUID: {camera_uuid}")
@@ -1175,50 +1054,6 @@ def stream_supervisar_camara(request, camera_uuid):
     return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
 
 
-# def stream_supervisar_camara(request, camera_uuid):
-#     camera_data = get_camera_by_uuid(camera_uuid)
-#     if not camera_data:
-#         return HttpResponse("Cámara no encontrada", status=404)
-
-#     ip_url = camera_data['ip_url']
-#     polygons = camera_data.get('mesas', [])
-
-#     def generate_frames():
-#         cap = cv2.VideoCapture(ip_url)
-#         while True:
-#             success, frame = cap.read()
-#             if not success:
-#                 # Retry connection
-#                 cap.release()
-#                 time.sleep(5)
-#                 cap = cv2.VideoCapture(ip_url)
-#                 continue
-
-#             frame = cv2.resize(frame, (640, 480))
-
-#             # Draw polygons and labels
-#             for polygon in polygons:
-#                 points = np.array(polygon['points'], dtype=np.int32)
-#                 cv2.polylines(frame, [points], isClosed=True, color=polygon['color'], thickness=2)
-#                 text_position = tuple(map(int, points[0]))
-#                 cv2.putText(frame, polygon['label'], text_position,
-#                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, polygon['color'], 2)
-
-#                 # Display additional information
-#                 info_text = f"Max: {polygon['max_personas']} | Detectadas: {polygon.get('personas_Detectadas', 0)}"
-#                 cv2.putText(frame, info_text, (text_position[0], text_position[1] + 20),
-#                             cv2.FONT_HERSHEY_SIMPLEX, 0.4, polygon['color'], 1)
-
-#             _, buffer = cv2.imencode('.jpg', frame)
-#             frame_bytes = buffer.tobytes()
-#             yield (b'--frame\r\n'
-#                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-
-#         cap.release()
-
-#     return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
-
-
 def obtener_info_mesas_uuid(request, camera_uuid):
     camera_data = get_camera_by_uuid(camera_uuid)
     if not camera_data:
@@ -1226,28 +1061,6 @@ def obtener_info_mesas_uuid(request, camera_uuid):
 
     polygons = camera_data.get('mesas', [])
     return JsonResponse({'mesas': polygons})
-
-
-# def obtener_info_mesas_uuid(request, camera_uuid):
-#     db_data = load_json_data()
-#     camera = None
-#     for ambiente in db_data['ambientes']:
-#         for piso, piso_data in ambiente['piso'].items():
-#             for cam in piso_data.get('camara', []):
-#                 if cam.get('uuid') == str(camera_uuid):
-#                     camera = cam
-#                     break
-#             if camera:
-#                 break
-#         if camera:
-#             break
-#     if not camera:
-#         return JsonResponse({'error': 'Cámara no encontrada'})
-
-#     polygons = camera.get('mesas', [])
-
-#     return JsonResponse({'mesas': polygons})
-
 
 from collections import defaultdict
 

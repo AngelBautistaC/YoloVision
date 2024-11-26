@@ -82,6 +82,11 @@
                 "espacio_libre": 3,
                 "espacio_ocupado": 3
               }
+            },
+            {
+              "ip_url": "http://192.168.31.17:8081/video",
+              "label": "iPadProm1",
+              "px_m": 178.53906122843426
             }
           ]
         },
@@ -150,6 +155,10 @@
                 ]
               ],
               "px_m": 603.8925221761067
+            },
+            {
+              "ip_url": "http://192.168.31.17:8081/video",
+              "label": "26noviPad"
             }
           ]
         },
