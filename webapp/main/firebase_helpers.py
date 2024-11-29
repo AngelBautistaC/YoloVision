@@ -61,34 +61,6 @@ def get_camera_by_uuid(camera_uuid):
     # Si no se encontró la cámara, retornar None
     return None
 
-
-# def get_camera_by_uuid(camera_uuid): 
-#     # Convertir el UUID a string si es necesario
-#     camera_uuid_str = str(camera_uuid)
-
-#     # Referencia a la raíz de los ambientes
-#     ref = db.reference('ambientes')
-#     snapshot = ref.get()
-
-#     # Recorrer todos los ambientes
-#     for ambiente_nombre, ambiente_data in snapshot.items():
-#         print(f"Ambiente: {ambiente_nombre}")
-#         # Recorrer los pisos dentro de cada ambiente
-#         for piso, piso_data in ambiente_data.get('piso', {}).items():
-#             print(f"  Piso: {piso}")
-#             # Recorrer las cámaras dentro de cada piso
-#             for cam_uuid, cam_data in piso_data.get('camara', {}).items():
-#                 print(f"    Cámara mmmm: {camera_uuid_str}")
-#                 print(f"    Cámara UUID: {cam_uuid}")
-
-#                 # Comparar los UUIDs como cadenas
-#                 if cam_uuid == camera_uuid_str:
-#                     print(f"    Entroooooo")
-#                     return cam_data
-#     # Si no se encontró la cámara, retornar None
-#     return None
-
-
 def save_camera_data(ambiente_nombre, piso, camera_uuid, camera_data):
  
     camera_ref = db.reference(f"ambientes/{ambiente_nombre}/piso/{piso}/camara/{camera_uuid}")
@@ -100,13 +72,6 @@ def save_camera_data(ambiente_nombre, piso, camera_uuid, camera_data):
 
 
 
-# def save_camera_data2(ambiente_nombre, piso, camera_uuid, camera_data):
-#     # Obtener referencia a la raíz de los ambientes
-#     # Referencia a la ubicación específica en Firebase
-#     camera_ref = db.reference(f'cameras/{camera_uuid}')
-    
-#     # Guardar los datos de la cámara
-#     camera_ref.set(camera_data)
 
 def save_camera_data2(ambiente_nombre, piso, camera_uuid, camera_data):
     camera_ref = db.reference(f"ambientes/{ambiente_nombre}/piso/{piso}/camara/{camera_uuid}")
@@ -197,3 +162,19 @@ def save_user_to_firebase(email, role):
         'role': role,
     }
     ref.push(user_data)  # Save user data with a unique ID
+
+    # firebase_helpers.py
+def get_ambientes_and_pisos_from_db():
+    ref = db.reference('ambientes')
+    ambientes_snapshot = ref.get()
+
+    ambientes_data = []
+    if ambientes_snapshot:
+        for ambiente_nombre, ambiente_data in ambientes_snapshot.items():
+            pisos = list(ambiente_data.get('piso', {}).keys())
+            ambientes_data.append({
+                'nombreAmbiente': ambiente_nombre,
+                'pisos': pisos,
+            })
+    return ambientes_data
+

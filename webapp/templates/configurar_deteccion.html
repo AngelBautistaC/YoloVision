@@ -318,8 +318,10 @@ document.addEventListener('DOMContentLoaded', function() {
     polygonCanvas.addEventListener('mousemove', function(e) {
         if (isDragging && selectedPolygon && selectedVertexIndex !== null) {
             const rect = polygonCanvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const scaleX = polygonCanvas.width / rect.width;
+            const scaleY = polygonCanvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
 
             selectedPolygon.points[selectedVertexIndex] = [x, y];
             drawPolygons();

@@ -15,7 +15,7 @@ def start_detection_task(camera_uuid):
 
     ip_url = camera_data['ip_url']
     pixels_per_meter = camera_data['px_m']
-    detection_interval = camera_data.get('detection_interval', 5)  # Default to 5 seconds
+    detection_interval = camera_data.get('detection_interval', 1)  # Default to 5 seconds
     polygons = camera_data.get('mesas', [])
 
     cap = cv2.VideoCapture(ip_url)
@@ -23,7 +23,7 @@ def start_detection_task(camera_uuid):
 
     tracking_data_list = []
     for polygon in polygons:
-        expanded_polygon = expand_polygon(polygon['points'], 0.3, pixels_per_meter)
+        expanded_polygon = expand_polygon(polygon['points'], 0, pixels_per_meter)
         track_history = initialize_tracking()
         counting_regions = initialize_counting_regions(expanded_polygon, polygon['max_personas'])
         tracking_data_list.append({
