@@ -860,10 +860,16 @@ def calibrar_camara_paso1(request):
 
     # Obtener ambientes y pisos desde la base de datos
     ambientes_data = get_ambientes_and_pisos_from_db()
+    ambientes_data_json = json.dumps(ambientes_data)
+
+    context = {
+        'step': '1',
+        'camera_connected': False,
+        'ambientes_data': ambientes_data,
+        'ambientes_data_json': ambientes_data_json,
+    }
+
     
-
-    context = {'step': '1', 'camera_connected': False, 'ambientes_data': ambientes_data}
-
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         ip_port = request.POST.get('ip_port')
         camera_name = request.POST.get('camera_name')

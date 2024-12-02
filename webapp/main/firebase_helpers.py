@@ -178,3 +178,25 @@ def get_ambientes_and_pisos_from_db():
             })
     return ambientes_data
 
+
+def get_cameras_by_status(status):
+    """
+    Obtiene todas las cámaras con un estado específico desde Firebase.
+    """
+    ref = db.reference('ambientes')
+    snapshot = ref.get()
+
+    cameras = []
+    if snapshot:
+        for ambiente_nombre, ambiente_data in snapshot.items():
+            pisos = ambiente_data.get('piso', {})
+            if isinstance(pisos, dict):
+                for piso_nombre, piso_data in pisos.items():
+                    camaras = piso_data.get('camara', {})
+                    if isinstance(camaras, dict):
+                        for cam_uuid, cam_data in camaras.items():
+                            if cam_data.get('status') == status:
+                                cam_data['ambiente'] = ambiente_nombre
+                                cam_data['piso'] = piso_nombre
+                                cameras.append(cam_data)
+    return cameras

@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block page_title %}Configuración{% endblock %}
+{% block page_title %}Calibración de Cámara{% endblock %}
 {% block content %}
 <div class="container mt-5">
     <h2>Calibración de Cámara</h2>
@@ -23,7 +23,7 @@
                     <label for="camera_name" class="form-label">Nombre de la cámara</label>
                     <input type="text" class="form-control" id="camera_name" name="camera_name" required>
                 </div>
-                <!-- calibrar_camara.html -->
+                <!-- Selector de Ambiente -->
                 <div class="mb-3">
                     <label for="ambiente" class="form-label">Ambiente</label>
                     <select class="form-select" id="ambiente" name="ambiente" required>
@@ -33,31 +33,32 @@
                         {% endfor %}
                     </select>
                 </div>
+                <!-- Selector de Piso -->
                 <div class="mb-3">
                     <label for="piso" class="form-label">Piso</label>
                     <select class="form-select" id="piso" name="piso" required>
                         <option value="">Seleccione un piso</option>
-                        <!-- Pisos serán cargados dinámicamente -->
+                        <!-- Los pisos se cargarán dinámicamente -->
                     </select>
                 </div>
 
                 <button type="submit" class="btn btn-primary">Conectar</button>
-                
             </form>
-            <button type="button" id="continue-btn" class="btn btn-primary">Continuar</button>
-    
+            <button type="button" id="continue-btn" class="btn btn-primary" style="display: none;">Continuar</button>
+
             <div id="stream-container" class="mt-3" style="display: none;">
                 <!-- El stream se insertará aquí -->
             </div>
         </div>
-        
     </div>
 
-    
-
-
-    <!-- Agregar un elemento para almacenar los datos de ambientes en JSON -->
-    <script type="application/json" id="ambientes-data">{{ ambientes_data|safe }}</script>
+    <!-- Mostrar ambientes_data para depuración -->
+    <!-- <pre>{{ ambientes_data }}</pre> -->
+    <!-- Incluir los datos para JavaScript -->
+    <script>
+        const ambientesData = {{ ambientes_data_json|safe }};
+        console.log('Ambientes Data:', ambientesData);  // Para depuración
+    </script>
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -65,19 +66,19 @@
         const continueBtn = document.getElementById('continue-btn');
         const streamContainer = document.getElementById('stream-container');
 
-        // Obtener los datos de ambientes desde el elemento con id 'ambientes-data'
-        const ambientesData = JSON.parse(document.getElementById('ambientes-data').textContent);
-
         // Cargar pisos dinámicamente cuando se seleccione un ambiente
         const ambienteSelect = document.getElementById('ambiente');
         const pisoSelect = document.getElementById('piso');
 
         ambienteSelect.addEventListener('change', function() {
             const selectedAmbiente = ambienteSelect.value;
-            const ambiente = ambientesData.find(a => a.nombreAmbiente === selectedAmbiente);
+            console.log('Ambiente seleccionado:', selectedAmbiente);  // Para depuración
+            const ambiente = ambientesData.find(a => a.nombreAmbiente.trim().toLowerCase() === selectedAmbiente.trim().toLowerCase());
+            console.log('Ambiente encontrado:', ambiente);  // Para depuración
             pisoSelect.innerHTML = '<option value="">Seleccione un piso</option>';
             if (ambiente) {
                 ambiente.pisos.forEach(piso => {
+                    console.log('Agregando piso:', piso);  // Para depuración
                     const option = document.createElement('option');
                     option.value = piso;
                     option.textContent = piso;
