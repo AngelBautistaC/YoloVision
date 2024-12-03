@@ -323,7 +323,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const scaleY = polygonCanvas.height / rect.height;
             const x = (e.clientX - rect.left) * scaleX;
             const y = (e.clientY - rect.top) * scaleY;
-
             selectedPolygon.points[selectedVertexIndex] = [x, y];
             drawPolygons();
         }

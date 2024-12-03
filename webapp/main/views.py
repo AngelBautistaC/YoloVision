@@ -703,151 +703,7 @@ def crear_form_view(request):
 
 logger = logging.getLogger(__name__)
 
-# def calibrar_camara_paso1(request):
-#         # Limpiar datos de calibración previos
-#     calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
-#     for key in calibration_keys:
-#         if key in request.session:
-#             del request.session[key]
-    
-    
-    
-#     context = {'step': '1', 'camera_connected': False}
 
-#     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        
-#         ip_port = request.POST.get('ip_port')
-#         camera_name = request.POST.get('camera_name')
-#         ambiente = request.POST.get('ambiente')
-#         piso = request.POST.get('piso', '1')  # Asumimos piso 1 por defecto
-
-#         if not ip_port:
-#             return JsonResponse({'success': False, 'message': 'La URL del stream está vacía'})
-
-#         try:
-#             cap = cv2.VideoCapture(ip_port)
-#             if not cap.isOpened():
-#                 logger.error(f"No se pudo abrir el stream: {ip_port}")
-#                 return JsonResponse({'success': False, 'message': 'No se pudo abrir el stream de la cámara. Verifica la URL y el formato.'})
-
-#             frame_read = False
-#             for _ in range(30):
-#                 ret, frame = cap.read()
-#                 if ret and frame is not None:
-#                     frame_read = True
-#                     break
-
-#             cap.release()
-#             frame = cv2.resize(frame, (640, 480))
-
-#             if frame_read:
-#                 # Save necessary data in session
-#                 request.session['ip_port'] = ip_port
-#                 request.session['camera_name'] = camera_name
-#                 request.session['ambiente'] = ambiente
-#                 request.session['piso'] = piso
-
-#                 # Create camera_data dictionary
-#                 camera_data = {
-#                     "ip_url": ip_port,
-#                     "label": camera_name,
-#                 }
-
-#                 # Save camera data to JSON
-#                 update_camera_data(ambiente, piso, camera_data)
-
-#                 logger.info(f"Conexión exitosa. Datos guardados en sesión y JSON.")
-#                 return JsonResponse({'success': True, 'message': 'Conexión exitosa'})
-#             else:
-#                 logger.error("No se pudo leer un frame después de 30 intentos")
-#                 return JsonResponse({'success': False, 'message': 'No se pudo leer un frame de la cámara después de 30 intentos'})
-#         except Exception as e:
-#             logger.exception(f"Error inesperado al conectar con la cámara: {str(e)}")
-#             return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'})
-
-#     return render(request, 'calibrar_camara.html', context)
-
-
-# @login_required
-# @role_required(allowed_roles=['operator', 'administrator'])
-# def calibrar_camara_paso3(request):
-
-#     context = {'step': '3'}
-#     ip_port = request.session.get('ip_port')
-#     context['ip_port'] = ip_port
-
-#     # Verificar si se ha completado el paso 1
-#     if not request.session.get('ip_port'):
-#         return redirect('calibrar_camara_paso1')
-    
-#     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_50)
-#     aruco_params = cv2.aruco.DetectorParameters()
-#     detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
-
-#     marker_size = 0.15  # 15 cm
-
-#     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-#         action = request.POST.get('action')
-#         logger.info(f"Paso 3 - Acción: {action}, URL del stream: {ip_port}")
-
-#         if action == 'capture_near' or action == 'capture_far':
-#             try:
-#                 cap = cv2.VideoCapture(ip_port)
-#                 if not cap.isOpened():
-#                     return JsonResponse({'success': False, 'message': 'No se pudo abrir el stream de la cámara.'})
-
-#                 ret, frame = cap.read()
-#                 cap.release()
-
-#                 if not ret or frame is None:
-#                     return JsonResponse({'success': False, 'message': 'No se pudo capturar la imagen'})
-                
-#                 # Redimensionar el frame a 640x480
-#                 frame = cv2.resize(frame, (640, 480))
-#                 corners, ids, _ = detector.detectMarkers(frame)
-#                 if ids is not None:
-#                     marker_width_px = np.linalg.norm(corners[0][0][1] - corners[0][0][0])
-#                     pixels_per_meter = marker_width_px / marker_size
-
-#                     if action == 'capture_near':
-#                         request.session['pixels_per_meter_near'] = request.session.get('pixels_per_meter_near', []) + [pixels_per_meter]
-#                     else:
-#                         request.session['pixels_per_meter_far'] = request.session.get('pixels_per_meter_far', []) + [pixels_per_meter]
-
-#                     return JsonResponse({'success': True, 'captures': len(request.session.get('pixels_per_meter_near', [])) if action == 'capture_near' else len(request.session.get('pixels_per_meter_far', []))})
-#                 else:
-#                     return JsonResponse({'success': False, 'message': 'No se detectó el marcador ArUco'})
-
-#             except Exception as e:
-#                 logger.exception(f"Error al capturar: {str(e)}")
-#                 return JsonResponse({'success': False, 'message': f'Error al capturar: {str(e)}'})
-
-#         elif action == 'calculate':
-#             pixels_per_meter_near = request.session.get('pixels_per_meter_near', [])
-#             pixels_per_meter_far = request.session.get('pixels_per_meter_far', [])
-
-#             if len(pixels_per_meter_near) < 5 or len(pixels_per_meter_far) < 5:
-#                 return JsonResponse({'success': False, 'message': 'Se necesitan al menos 5 capturas para cada distancia'})
-
-#             pixels_per_meter = np.mean(pixels_per_meter_near[:5] + pixels_per_meter_far[:5])
-            
-#             request.session['pixels_per_meter'] = pixels_per_meter
-#             camera_data = load_json_data()
-#             for amb in camera_data["ambientes"]:
-#                 if amb["nombreAmbiente"] == request.session.get('ambiente'):
-#                     for cam in amb["piso"][request.session.get('piso')]["camara"]:
-#                         if cam["ip_url"] == ip_port:
-#                             cam["px_m"] = pixels_per_meter
-#                             break
-#                     break
-#             save_json_data(camera_data)
-            
-#             request.session['pixels_per_meter'] = pixels_per_meter
-            
-#             return JsonResponse({'success': True, 'pixels_per_meter': pixels_per_meter})
-        
-
-#     return render(request, 'calibrar_camara.html', context)
 
 @login_required
 @role_required(allowed_roles=['operator', 'administrator'])
@@ -916,6 +772,8 @@ def calibrar_camara_paso1(request):
             return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'})
 
     return render(request, 'calibrar_camara.html', context)
+
+
 
 @login_required
 @role_required(allowed_roles=['operator', 'administrator'])
@@ -1014,7 +872,6 @@ def calibrar_camara_paso3(request):
             return JsonResponse({'success': True, 'pixels_per_meter': pixels_per_meter})
 
     return render(request, 'calibrar_camara.html', context)
-
 
 
 
