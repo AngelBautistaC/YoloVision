@@ -29,6 +29,11 @@ def get_camera_by_ip(ip_url):
     for ambiente_nombre, ambiente_data in snapshot.items():
         # Recorrer los pisos dentro de cada ambiente
         for piso, piso_data in ambiente_data.get('piso', {}).items():
+            # Verificar si piso_data es un diccionario
+            if not isinstance(piso_data, dict):
+                print(f"Advertencia: Los datos del piso '{piso}' en el ambiente '{ambiente_nombre}' no son un diccionario. Se omitirán estos datos.")
+                continue  # Saltar este piso
+
             # Recorrer las cámaras dentro de cada piso
             for cam_uuid, cam_data in piso_data.get('camara', {}).items():
                 # Verificar si la URL IP coincide
@@ -37,6 +42,7 @@ def get_camera_by_ip(ip_url):
                     return cam_uuid, cam_data
     # Si no se encontró la cámara, retornar None, None
     return None, None
+
 
 def get_camera_by_uuid(camera_uuid): 
     # Convertir el UUID a string si es necesario
@@ -197,3 +203,29 @@ def save_user_to_firebase(email, role):
         'role': role,
     }
     ref.push(user_data)  # Save user data with a unique ID
+
+def get_ambientes_and_pisos_from_db():
+    ref = db.reference('ambientes')
+    ambientes_snapshot = ref.get()
+
+    ambientes_data = []
+    if ambientes_snapshot:
+        for ambiente_nombre, ambiente_data in ambientes_snapshot.items():
+            pisos_dict = ambiente_data.get('piso', {})
+            # Verificar si pisos_dict es un diccionario
+            if not isinstance(pisos_dict, dict):
+                print(f"Advertencia: Los datos de 'piso' en el ambiente '{ambiente_nombre}' no son un diccionario. Se omitirán estos datos.")
+                continue  # Saltar este ambiente
+
+            pisos = []
+            for piso_nombre, piso_data in pisos_dict.items():
+                if isinstance(piso_data, dict):
+                    pisos.append(piso_nombre)
+                else:
+                    print(f"Advertencia: Los datos del piso '{piso_nombre}' en el ambiente '{ambiente_nombre}' no son un diccionario. Se omitirán este piso.")
+
+            ambientes_data.append({
+                'nombreAmbiente': ambiente_nombre,
+                'pisos': pisos,
+            })
+    return ambientes_data

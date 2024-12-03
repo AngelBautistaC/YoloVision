@@ -13,7 +13,7 @@ from shapely.geometry.point import Point
 from ultralytics import YOLO
 import base64
 import math
-from .firebase_helpers import get_camera_by_ip, save_camera_data,get_camera_by_uuid,save_camera_data2
+from .firebase_helpers import get_camera_by_ip, save_camera_data,get_camera_by_uuid,save_camera_data2,get_ambientes_and_pisos_from_db
 from .tasks import start_detection_task
 from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
 
@@ -282,7 +282,7 @@ def stream_video(request):
         if tracking_active and model:
             tracking_data_list = []
             for polygon in polygons:
-                expanded_polygon = expand_polygon(polygon['points'], 0.3, pixels_per_meter)
+                expanded_polygon = expand_polygon(polygon['points'], 0, pixels_per_meter)
                 track_history = initialize_tracking()
                 counting_regions = initialize_counting_regions(expanded_polygon, polygon['max_personas'])
                 tracking_data_list.append({
@@ -703,23 +703,42 @@ def crear_form_view(request):
 
 logger = logging.getLogger(__name__)
 
+
+
+@login_required
+@role_required(allowed_roles=['operator', 'administrator'])
 def calibrar_camara_paso1(request):
-        # Limpiar datos de calibración previos
-    calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
+    # Limpiar datos de calibración previos
+    calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
     for key in calibration_keys:
         if key in request.session:
             del request.session[key]
-    context = {'step': '1', 'camera_connected': False}
 
+    # Obtener ambientes y pisos desde la base de datos
+    ambientes_data = get_ambientes_and_pisos_from_db()
+    ambientes_data_json = json.dumps(ambientes_data)
+
+    context = {
+        'step': '1',
+        'camera_connected': False,
+        'ambientes_data': ambientes_data,
+        'ambientes_data_json': ambientes_data_json,
+    }
+
+    
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        
         ip_port = request.POST.get('ip_port')
         camera_name = request.POST.get('camera_name')
         ambiente = request.POST.get('ambiente')
-        piso = request.POST.get('piso', '1')  # Asumimos piso 1 por defecto
+        piso = request.POST.get('piso')
 
         if not ip_port:
             return JsonResponse({'success': False, 'message': 'La URL del stream está vacía'})
+
+        # Verificar si la cámara ya existe
+        camera_uuid, existing_camera_data = get_camera_by_ip(ip_port)
+        if camera_uuid:
+            return JsonResponse({'success': False, 'message': 'Ya existe una cámara con esta IP:Puerto en la base de datos. No puede calibrar una cámara con la misma IP:Puerto.'})
 
         try:
             cap = cv2.VideoCapture(ip_port)
@@ -735,25 +754,15 @@ def calibrar_camara_paso1(request):
                     break
 
             cap.release()
-            frame = cv2.resize(frame, (640, 480))
 
             if frame_read:
-                # Save necessary data in session
+                # Guardar datos en la sesión
                 request.session['ip_port'] = ip_port
                 request.session['camera_name'] = camera_name
                 request.session['ambiente'] = ambiente
                 request.session['piso'] = piso
 
-                # Create camera_data dictionary
-                camera_data = {
-                    "ip_url": ip_port,
-                    "label": camera_name,
-                }
-
-                # Save camera data to JSON
-                update_camera_data(ambiente, piso, camera_data)
-
-                logger.info(f"Conexión exitosa. Datos guardados en sesión y JSON.")
+                logger.info(f"Conexión exitosa. Datos guardados en sesión.")
                 return JsonResponse({'success': True, 'message': 'Conexión exitosa'})
             else:
                 logger.error("No se pudo leer un frame después de 30 intentos")
@@ -765,18 +774,22 @@ def calibrar_camara_paso1(request):
     return render(request, 'calibrar_camara.html', context)
 
 
+
 @login_required
 @role_required(allowed_roles=['operator', 'administrator'])
 def calibrar_camara_paso3(request):
-
     context = {'step': '3'}
     ip_port = request.session.get('ip_port')
+    camera_name = request.session.get('camera_name')
+    ambiente = request.session.get('ambiente')
+    piso = request.session.get('piso')
+
     context['ip_port'] = ip_port
 
     # Verificar si se ha completado el paso 1
-    if not request.session.get('ip_port'):
+    if not ip_port:
         return redirect('calibrar_camara_paso1')
-    
+
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_50)
     aruco_params = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
@@ -798,20 +811,22 @@ def calibrar_camara_paso3(request):
 
                 if not ret or frame is None:
                     return JsonResponse({'success': False, 'message': 'No se pudo capturar la imagen'})
-                
+
                 # Redimensionar el frame a 640x480
                 frame = cv2.resize(frame, (640, 480))
                 corners, ids, _ = detector.detectMarkers(frame)
-                if ids is not None:
+                if ids is not None and len(ids) > 0:
                     marker_width_px = np.linalg.norm(corners[0][0][1] - corners[0][0][0])
                     pixels_per_meter = marker_width_px / marker_size
 
                     if action == 'capture_near':
                         request.session['pixels_per_meter_near'] = request.session.get('pixels_per_meter_near', []) + [pixels_per_meter]
+                        captures = len(request.session['pixels_per_meter_near'])
                     else:
                         request.session['pixels_per_meter_far'] = request.session.get('pixels_per_meter_far', []) + [pixels_per_meter]
+                        captures = len(request.session['pixels_per_meter_far'])
 
-                    return JsonResponse({'success': True, 'captures': len(request.session.get('pixels_per_meter_near', [])) if action == 'capture_near' else len(request.session.get('pixels_per_meter_far', []))})
+                    return JsonResponse({'success': True, 'captures': captures})
                 else:
                     return JsonResponse({'success': False, 'message': 'No se detectó el marcador ArUco'})
 
@@ -827,24 +842,37 @@ def calibrar_camara_paso3(request):
                 return JsonResponse({'success': False, 'message': 'Se necesitan al menos 5 capturas para cada distancia'})
 
             pixels_per_meter = np.mean(pixels_per_meter_near[:5] + pixels_per_meter_far[:5])
-            
+
             request.session['pixels_per_meter'] = pixels_per_meter
-            camera_data = load_json_data()
-            for amb in camera_data["ambientes"]:
-                if amb["nombreAmbiente"] == request.session.get('ambiente'):
-                    for cam in amb["piso"][request.session.get('piso')]["camara"]:
-                        if cam["ip_url"] == ip_port:
-                            cam["px_m"] = pixels_per_meter
-                            break
-                    break
-            save_json_data(camera_data)
-            
-            request.session['pixels_per_meter'] = pixels_per_meter
-            
+
+            # Verificar nuevamente si la cámara ya existe
+            camera_uuid, existing_camera_data = get_camera_by_ip(ip_port)
+            if camera_uuid:
+                return JsonResponse({'success': False, 'message': 'Ya existe una cámara con esta IP:Puerto en la base de datos. No puede calibrar una cámara con la misma IP:Puerto.'})
+
+            # Crear el diccionario de datos de la cámara
+            camera_uuid = str(uuid.uuid4())
+            camera_data = {
+                "ip_url": ip_port,
+                "label": camera_name,
+                "px_m": pixels_per_meter,
+                "status": "calibrated",
+                "uuid": camera_uuid,
+            }
+
+            # Guardar en Firebase
+            save_camera_data(ambiente, piso, camera_uuid, camera_data)
+
+            # Limpiar la sesión si es necesario
+            calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
+            for key in calibration_keys:
+                if key in request.session:
+                    del request.session[key]
+
             return JsonResponse({'success': True, 'pixels_per_meter': pixels_per_meter})
-        
 
     return render(request, 'calibrar_camara.html', context)
+
 
 
 def capture_frame(ip_port):

@@ -23,7 +23,7 @@ def start_detection_task(camera_uuid):
 
     tracking_data_list = []
     for polygon in polygons:
-        expanded_polygon = expand_polygon(polygon['points'], 0.3, pixels_per_meter)
+        expanded_polygon = expand_polygon(polygon['points'], 0, pixels_per_meter)
         track_history = initialize_tracking()
         counting_regions = initialize_counting_regions(expanded_polygon, polygon['max_personas'])
         tracking_data_list.append({
