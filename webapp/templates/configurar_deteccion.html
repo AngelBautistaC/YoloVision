@@ -50,6 +50,10 @@
                 </tbody>
             </table>
             <button id="add-polygon-btn" class="btn btn-primary mt-3">Agregar Polígono</button>
+            <div class="mt-3">
+                <label for="detection-interval">Intervalo de detección (1-60 seg):</label>
+                <input type="number" id="detection-interval" class="form-control" min="1" max="60" value="5">
+            </div>            
             <button id="start-tracking-btn" class="btn btn-success mt-3">Guardar Polígonos y Iniciar Detección</button>
         </div>
     </div>
@@ -123,10 +127,10 @@ document.addEventListener('DOMContentLoaded', function() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            videoStream.src = '{% url "stream_video" %}';
+            videoStream.src = '{% url "stream_video" %}'; // Revertido a la versión original
             videoContainer.style.display = 'block';
 
-            // Call detectar_mesas to perform automatic table detection
+            // Llamar a detectar_mesas
             fetch('{% url "detectar_mesas" %}', {
                 method: 'POST',
                 headers: {
@@ -139,7 +143,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     detections = data.detections;
                     updatePolygonTable();
-                    // Removed startPolygonDetection as it's not necessary here
                 } else {
                     alert(data.error);
                 }
@@ -403,20 +406,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.getElementById('start-tracking-btn').addEventListener('click', function() {
+    const detectionInterval = parseInt(document.getElementById('detection-interval').value, 10);
+    if (isNaN(detectionInterval) || detectionInterval < 1 || detectionInterval > 60) {
+        alert('El intervalo de detección debe ser un número entre 1 y 60.');
+        return;
+    }
+
     fetch('{% url "iniciar_tracking" %}', {
         method: 'POST',
         headers: {
             'X-CSRFToken': '{{ csrf_token }}',
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 'polygons': detections })
+        body: JSON.stringify({ 'polygons': detections, 'detection_interval': detectionInterval })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Show success message
             const cameraUuid = data.camera_uuid;
-            // Hide current content and show success message
             document.querySelector('.container').innerHTML = `
                 <div class="text-center">
                     <h3>Configuración Completada</h3>

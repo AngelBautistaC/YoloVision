@@ -31,18 +31,22 @@ def get_camera_by_ip(ip_url):
         for piso, piso_data in ambiente_data.get('piso', {}).items():
             # Verificar si piso_data es un diccionario
             if not isinstance(piso_data, dict):
-                print(f"Advertencia: Los datos del piso '{piso}' en el ambiente '{ambiente_nombre}' no son un diccionario. Se omitirán estos datos.")
                 continue  # Saltar este piso
 
             # Recorrer las cámaras dentro de cada piso
-            for cam_uuid, cam_data in piso_data.get('camara', {}).items():
+            camaras = piso_data.get('camara', {})
+            if not isinstance(camaras, dict):
+                continue
+
+            for cam_uuid, cam_data in camaras.items():
                 # Verificar si la URL IP coincide
                 if cam_data.get('ip_url') == ip_url:
-                    # Retornar el UUID de la cámara y los datos de la cámara
+                    # Añadir ambiente y piso al cam_data
+                    cam_data['ambiente'] = ambiente_nombre
+                    cam_data['piso'] = piso
                     return cam_uuid, cam_data
     # Si no se encontró la cámara, retornar None, None
     return None, None
-
 
 def get_camera_by_uuid(camera_uuid): 
     # Convertir el UUID a string si es necesario

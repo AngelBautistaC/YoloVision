@@ -87,51 +87,56 @@ def access_denied(request):
     return render(request, 'access_denied.html')
 
 
-def configurar_deteccion(request):
-    data = load_json_data()
-    camaras_calibradas = []
-    for ambiente in data['ambientes']:
-        for piso, piso_data in ambiente['piso'].items():
-            for camara in piso_data.get('camara', []):
-                if camara.get('status') == 'calibrated':
-                    camaras_calibradas.append({
-                        'ambiente': ambiente['nombreAmbiente'],
-                        'piso': piso,
-                        'label': camara.get('label', 'Sin etiqueta'),
-                        'ip_url': camara['ip_url']
-                    })
+from firebase_admin import db
 
-    
+def configurar_deteccion(request):
+    ref = db.reference('ambientes')
+    snapshot = ref.get()
+
+    camaras_calibradas = []
+    if snapshot:
+        for ambiente_nombre, ambiente_data in snapshot.items():
+            pisos_dict = ambiente_data.get('piso', {})
+            if not isinstance(pisos_dict, dict):
+                continue
+
+            for piso_nombre, piso_data in pisos_dict.items():
+                if not isinstance(piso_data, dict):
+                    continue
+
+                camaras_data = piso_data.get('camara', {})
+                if not isinstance(camaras_data, dict):
+                    continue
+
+                for cam_uuid, cam_data in camaras_data.items():
+                    # Mostrar solo cámaras con estado "calibrated"
+                    if cam_data.get('status') == 'calibrated':
+                        camaras_calibradas.append({
+                            'ambiente': ambiente_nombre,
+                            'piso': piso_nombre,
+                            'label': cam_data.get('label', 'Sin etiqueta'),
+                            'ip_url': cam_data['ip_url']
+                        })
+
     context = {'camaras': camaras_calibradas}
     return render(request, 'configurar_deteccion.html', context)
+
 
 
 
 def iniciar_deteccion(request):
     if request.method == 'POST':
         ip_url = request.POST.get('ip_url')
-        data = load_json_data()
-        camara_data = None
-        for ambiente in data['ambientes']:
-            for piso, piso_data in ambiente['piso'].items():
-                for camara in piso_data.get('camara', []):
-                    if camara['ip_url'] == ip_url:
-                        camara_data = camara
-                        break
-                if camara_data:
-                    break
-            if camara_data:
-                break
-        
-        if not camara_data:
+        camera_uuid, cam_data = get_camera_by_ip(ip_url)
+
+        if not camera_uuid or not cam_data:
             return JsonResponse({'error': 'Cámara no encontrada'})
-        
+
         # Guardar datos de la cámara en la sesión
-        request.session['camera_data'] = camara_data
-        
+        request.session['camera_data'] = cam_data
         # Set tracking_active to False
         request.session['tracking_active'] = False
-        
+
         return JsonResponse({'success': True})
     
     return JsonResponse({'error': 'Método no permitido'})
@@ -207,39 +212,38 @@ def iniciar_tracking(request):
     if request.method == 'POST':
         data = json.loads(request.body)
         polygons = data.get('polygons', [])
+        detection_interval = data.get('detection_interval', 5)
+
+        # Obtener ip_url desde la sesión
         camera_data = request.session.get('camera_data')
-        
         if not camera_data:
             return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
 
         ip_url = camera_data['ip_url']
-        
-        # Obtener o crear el UUID de la cámara
+
+        # Obtener cámara desde Firebase (ya incluye ambiente y piso)
         camera_uuid, existing_camera_data = get_camera_by_ip(ip_url)
-        if not camera_uuid:
-            camera_uuid = str(uuid.uuid4())
-            camera_data['uuid'] = camera_uuid
-        else:
-            camera_data = existing_camera_data
+        if not camera_uuid or not existing_camera_data:
+            return JsonResponse({'error': 'Cámara no encontrada en Firebase'})
 
-        # Actualizar los datos de la cámara con los polígonos
-        camera_data['mesas'] = polygons
-        camera_data['detection_interval'] = data.get('detection_interval', 5)  # Intervalo de detección en segundos
+        # Actualizar los datos de la cámara con los nuevos polígonos y el intervalo
+        existing_camera_data['mesas'] = polygons
+        existing_camera_data['detection_interval'] = detection_interval
+        existing_camera_data['status'] = 'configurated'  # Actualizar estado
 
-        # Usar el ambiente y piso almacenado en la sesión
-        ambiente_nombre = request.session.get('ambiente')
-        piso = request.session.get('piso')
+        # Obtener ambiente y piso desde existing_camera_data (ya extraído por get_camera_by_ip)
+        ambiente_nombre = existing_camera_data['ambiente']
+        piso = existing_camera_data['piso']
 
-        # Guardar en Firebase
-        save_camera_data2(ambiente_nombre, piso, camera_uuid, camera_data)
+        # Guardar cambios en Firebase
+        save_camera_data2(ambiente_nombre, piso, camera_uuid, existing_camera_data)
 
-        # Iniciar la tarea de detección
+        # Iniciar la tarea de detección (opcional si está configurada en Celery)
         start_detection_task.delay(camera_uuid)
 
         return JsonResponse({'success': True, 'camera_uuid': camera_uuid})
 
     return JsonResponse({'error': 'Método no permitido'})
-
 
 
 
@@ -253,45 +257,21 @@ def stream_video(request):
     pixels_per_meter = camera_data['px_m']
     tracking_active = request.session.get('tracking_active', False)
 
+    # Obtener todos los polígonos desde la cámara y/o la sesión, tal como se hacía en local
+    polygons = camera_data.get('mesas', [])
+    detections = request.session.get('detections', [])
+    manual_polygons = request.session.get('manual_polygons', [])
+    polygons = polygons + detections + manual_polygons
+
     def generate_frames():
         cap = cv2.VideoCapture(ip_url)
+        if not cap.isOpened():
+            return
 
-        # Load model based on tracking state
         if tracking_active:
-            model = YOLO('yolov8n.pt')  # Model for people detection
+            model = YOLO('yolov8n.pt')
         else:
-            model = None  # No model needed for just drawing polygons
-
-        # Load polygons from 'database.json' for the current camera
-        db_data = load_json_data()
-        camera = None
-        for ambiente in db_data['ambientes']:
-            for piso, piso_data in ambiente['piso'].items():
-                for cam in piso_data.get('camara', []):
-                    if cam['ip_url'] == ip_url:
-                        camera = cam
-                        break
-            if camera:
-                break
-        if not camera:
-            cap.release()
-            return  # or yield an error frame
-
-        polygons = camera.get('mesas', [])
-
-        # Initialize tracking data only if tracking is active
-        if tracking_active and model:
-            tracking_data_list = []
-            for polygon in polygons:
-                expanded_polygon = expand_polygon(polygon['points'], 0, pixels_per_meter)
-                track_history = initialize_tracking()
-                counting_regions = initialize_counting_regions(expanded_polygon, polygon['max_personas'])
-                tracking_data_list.append({
-                    'polygon': polygon,
-                    'expanded_polygon': expanded_polygon,
-                    'track_history': track_history,
-                    'counting_regions': counting_regions
-                })
+            model = None
 
         while True:
             success, frame = cap.read()
@@ -299,47 +279,36 @@ def stream_video(request):
                 break
             frame = cv2.resize(frame, (640, 480))
 
-            if tracking_active and model:
-                # Perform tracking and counting for each polygon
-                for tracking_data in tracking_data_list:
-                    frame = track_and_count(
-                        frame, model, tracking_data['track_history'], tracking_data['counting_regions']
-                    )
-
-                # Update personas_Detectadas and reset counts
-                for tracking_data in tracking_data_list:
-                    polygon = tracking_data['polygon']
-                    personas_detectadas = tracking_data['counting_regions'][0]['counts']
-                    polygon['personas_Detectadas'] = personas_detectadas
-                    tracking_data['counting_regions'][0]['counts'] = 0  # Reset counts
-            else:
-                # No tracking; personas_Detectadas is zero
+            # Si no hay tracking, personas_detectadas = 0
+            if not tracking_active or model is None:
                 for polygon in polygons:
                     polygon['personas_Detectadas'] = 0
 
-            # Draw polygons
+            # Dibujar polígonos directamente desde los datos en sesión
             for polygon in polygons:
                 points = np.array(polygon['points'], dtype=np.int32)
-                cv2.polylines(frame, [points], isClosed=True, color=polygon['color'], thickness=2)
+                color = polygon.get('color', (0, 255, 0))
+                cv2.polylines(frame, [points], isClosed=True, color=color, thickness=2)
                 text_position = tuple(map(int, points[0]))
                 cv2.putText(frame, polygon['label'], text_position,
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, polygon['color'], 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-                # Mostrar información adicional
-                info_text = f"Area: {polygon['area']:.2f}m² | Max: {polygon['max_personas']} | Detectadas: {polygon.get('personas_Detectadas', 0)}"
+                area = polygon.get('area', 0)
+                max_p = polygon.get('max_personas', 0)
+                detectadas = polygon.get('personas_Detectadas', 0)
+                info_text = f"Area: {area:.2f}m² | Max: {max_p} | Detectadas: {detectadas}"
                 cv2.putText(frame, info_text, (text_position[0], text_position[1] + 20),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, polygon['color'], 1)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
 
-            _, buffer = cv2.imencode('.jpg', frame)
+            ret, buffer = cv2.imencode('.jpg', frame)
+            if not ret:
+                continue
             frame_bytes = buffer.tobytes()
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-
         cap.release()
 
     return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
-
-
 
 
 def generate_random_color():
@@ -522,28 +491,14 @@ def obtener_info_mesas(request):
     if not camera_data:
         return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
 
-    ip_url = camera_data['ip_url']
-    # Load polygons from 'database.json' for the current camera
-    db_data = load_json_data()
-    camera = None
-    for ambiente in db_data['ambientes']:
-        for piso, piso_data in ambiente['piso'].items():
-            for cam in piso_data.get('camara', []):
-                if cam['ip_url'] == ip_url:
-                    camera = cam
-                    break
-    if not camera:
-        return JsonResponse({'error': 'Cámara no encontrada en la base de datos'})
-
-    backend_polygons = camera.get('mesas', [])
-
-    # Mark backend polygons with type 'backend'
-    for polygon in backend_polygons:
-        polygon['type'] = 'backend'
-
-    # Also include polygons from session (detections and manual_polygons)
+    # Obtener polígonos detectados en la sesión
     detected_polygons = request.session.get('detections', [])
+    # Obtener polígonos manuales en la sesión
     manual_polygons = request.session.get('manual_polygons', [])
+
+    # En el escenario local que funcionaba, no se dependía de backend_polygons cargados desde archivo.
+    # Simplemente se dejaba vacío o se usaba lo que estuviera en la sesión.
+    backend_polygons = []
 
     return JsonResponse({'mesas': detected_polygons + manual_polygons, 'backend_polygons': backend_polygons})
 
