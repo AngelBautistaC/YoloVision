@@ -93,13 +93,14 @@ def configurar_deteccion(request):
     for ambiente in data['ambientes']:
         for piso, piso_data in ambiente['piso'].items():
             for camara in piso_data.get('camara', []):
-                if 'px_m' in camara:
+                if camara.get('status') == 'calibrated':
                     camaras_calibradas.append({
                         'ambiente': ambiente['nombreAmbiente'],
                         'piso': piso,
-                        'label': camara['label'],
+                        'label': camara.get('label', 'Sin etiqueta'),
                         'ip_url': camara['ip_url']
                     })
+
     
     context = {'camaras': camaras_calibradas}
     return render(request, 'configurar_deteccion.html', context)
@@ -863,11 +864,11 @@ def calibrar_camara_paso3(request):
             # Guardar en Firebase
             save_camera_data(ambiente, piso, camera_uuid, camera_data)
 
-            # Limpiar la sesión si es necesario
-            calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
-            for key in calibration_keys:
-                if key in request.session:
-                    del request.session[key]
+            # # Limpiar la sesión si es necesario
+            # calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
+            # for key in calibration_keys:
+            #     if key in request.session:
+            #         del request.session[key]
 
             return JsonResponse({'success': True, 'pixels_per_meter': pixels_per_meter})
 

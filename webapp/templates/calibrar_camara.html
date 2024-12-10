@@ -52,9 +52,7 @@
         </div>
     </div>
 
-    <!-- Mostrar ambientes_data para depuración -->
-    <!-- <pre>{{ ambientes_data }}</pre> -->
-    <!-- Incluir los datos para JavaScript -->
+
     <script>
         const ambientesData = {{ ambientes_data_json|safe }};
         console.log('Ambientes Data:', ambientesData);  // Para depuración
@@ -133,83 +131,6 @@
         }
     });
     </script>
-
-<!-- 
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const cameraForm = document.getElementById('camera-form');
-        const cameraInfoForm = document.getElementById('camera-info-form');
-        const continueBtn = document.getElementById('continue-btn');
-        const streamContainer = document.getElementById('stream-container');
-    
-        if (cameraForm) {
-            cameraForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                const formData = new FormData(this);
-                console.log('URL del stream a enviar:', formData.get('ip_port')); // Añade este log
-            
-                
-                fetch('{% url "calibrar_camara_paso1" %}', {  // Cambiar esta URL
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                        }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('Conexión exitosa:', data.message);
-                        if (streamContainer) {
-                            streamContainer.innerHTML = `<img id="stream" src="{% url 'camera_stream' %}?ip_port=${formData.get('ip_port')}" alt="Camera Stream">`;
-                            streamContainer.style.display = 'block';
-                        } else {
-                            console.error('El elemento stream-container no existe en el DOM');
-                            alert('Error: No se pudo mostrar el stream de la cámara');
-                        }
-                        if (cameraInfoForm) {
-                            cameraInfoForm.style.display = 'block';
-                        } else {
-                            console.error('El elemento camera-info-form no existe en el DOM');
-                        }
-                    } else {
-                        console.error('Error en la conexión:', data.message);
-                        alert(`Error: ${data.message}`);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error en la solicitud:', error);
-                    alert('Ocurrió un error al intentar conectar con la cámara');
-                });
-            });
-        } else {
-            console.error('El formulario de la cámara no existe en el DOM');
-        }
-    
-        if (cameraInfoForm) {
-            const inputs = cameraInfoForm.querySelectorAll('input, select');
-            inputs.forEach(input => {
-                input.addEventListener('input', checkForm);
-            });
-        }
-    
-        function checkForm() {
-            if (cameraInfoForm && continueBtn) {
-                const allFilled = Array.from(cameraInfoForm.querySelectorAll('input, select'))
-                    .every(input => input.value.trim() !== '');
-                continueBtn.disabled = !allFilled;
-            }
-        }
-    
-        if (continueBtn) {
-        continueBtn.addEventListener('click', function() {
-            window.location.href = '{% url "calibrar_camara_paso3" %}';  // Cambiar esta URL
-        });
-    }
-});
-    </script> -->
-
 
 {% elif step == '3' %}
 <h3>Paso 3: Obtención de pixels por metro</h3>
