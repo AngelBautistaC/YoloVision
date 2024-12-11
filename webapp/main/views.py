@@ -214,31 +214,32 @@ def iniciar_tracking(request):
         polygons = data.get('polygons', [])
         detection_interval = data.get('detection_interval', 5)
 
-        # Obtener ip_url desde la sesión
         camera_data = request.session.get('camera_data')
         if not camera_data:
             return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
 
         ip_url = camera_data['ip_url']
 
-        # Obtener cámara desde Firebase (ya incluye ambiente y piso)
         camera_uuid, existing_camera_data = get_camera_by_ip(ip_url)
         if not camera_uuid or not existing_camera_data:
             return JsonResponse({'error': 'Cámara no encontrada en Firebase'})
 
-        # Actualizar los datos de la cámara con los nuevos polígonos y el intervalo
         existing_camera_data['mesas'] = polygons
         existing_camera_data['detection_interval'] = detection_interval
-        existing_camera_data['status'] = 'configurated'  # Actualizar estado
+        existing_camera_data['status'] = 'configurated'
+        
+        # Si no existen los campos connection_state y connection_attempts, se crean por defecto
+        if 'connection_state' not in existing_camera_data:
+            existing_camera_data['connection_state'] = 'stable'
+        if 'connection_attempts' not in existing_camera_data:
+            existing_camera_data['connection_attempts'] = 0
 
-        # Obtener ambiente y piso desde existing_camera_data (ya extraído por get_camera_by_ip)
         ambiente_nombre = existing_camera_data['ambiente']
         piso = existing_camera_data['piso']
 
-        # Guardar cambios en Firebase
         save_camera_data2(ambiente_nombre, piso, camera_uuid, existing_camera_data)
 
-        # Iniciar la tarea de detección (opcional si está configurada en Celery)
+        # Iniciar tarea Celery (opcional)
         start_detection_task.delay(camera_uuid)
 
         return JsonResponse({'success': True, 'camera_uuid': camera_uuid})
@@ -1055,42 +1056,68 @@ def obtener_datos_monitoreo():
     ambientes_data = ambientes_ref.get()
     datos_monitoreo = []
     resumen_ambientes = defaultdict(lambda: {'personas_detectadas': 0, 'max_personas': 0, 'asientos_disponibles': 0})
+    camaras_configuradas = []
 
     if isinstance(ambientes_data, dict):
         for ambiente_nombre, ambiente_data in ambientes_data.items():
             pisos = ambiente_data.get('piso', {})
             if isinstance(pisos, dict):
-                for piso, piso_data in pisos.items():
+                for piso_nombre, piso_data in pisos.items():
                     camaras = piso_data.get('camara', {})
                     if isinstance(camaras, dict):
                         for cam_uuid, cam_data in camaras.items():
-                            cam_label = cam_data.get('label', 'Sin etiqueta')
-                            mesas = cam_data.get('mesas', [])
-                            if isinstance(mesas, list):
-                                for mesa in mesas:
-                                    personas_detectadas = mesa.get("personas_Detectadas", 0)
-                                    max_personas = mesa.get("max_personas", 0)
-                                    asientos_disponibles = max_personas - personas_detectadas
+                            # Solo cámaras con estado "configurated"
+                            if cam_data.get('status') == 'configurated':
+                                connection_state = cam_data.get('connection_state', 'stable')
+                                connection_attempts = cam_data.get('connection_attempts', 0)
+                                cam_label = cam_data.get('label', 'Sin etiqueta')
+                                mesas = cam_data.get('mesas', [])
 
-                                    mesa_info = {
-                                        "ambiente": ambiente_nombre,
-                                        "piso": piso,
-                                        "camara": cam_label,
-                                        "mesa_id": mesa.get("id", "N/A"),
-                                        "max_personas": max_personas,
-                                        "personas_detectadas": personas_detectadas,
-                                        "asientos_disponibles": asientos_disponibles,
-                                    }
-                                    datos_monitoreo.append(mesa_info)
+                                # Añadimos la cámara a la lista de cámaras configuradas
+                                camaras_configuradas.append({
+                                    "ambiente": ambiente_nombre,
+                                    "piso": piso_nombre,
+                                    "camara": cam_label,
+                                    "uuid": cam_uuid,
+                                    "connection_state": connection_state,
+                                    "connection_attempts": connection_attempts
+                                })
 
-                                    # Agregar al resumen
-                                    resumen_ambientes[ambiente_nombre]['personas_detectadas'] += personas_detectadas
-                                    resumen_ambientes[ambiente_nombre]['max_personas'] += max_personas
-                                    resumen_ambientes[ambiente_nombre]['asientos_disponibles'] += asientos_disponibles
+                                if isinstance(mesas, list):
+                                    for mesa in mesas:
+                                        personas_detectadas = mesa.get("personas_Detectadas", 0)
+                                        max_personas = mesa.get("max_personas", 0)
+                                        asientos_disponibles = max_personas - personas_detectadas
 
-    return datos_monitoreo, dict(resumen_ambientes)
+                                        mesa_info = {
+                                            "ambiente": ambiente_nombre,
+                                            "piso": piso_nombre,
+                                            "camara": cam_label,
+                                            "mesa_id": mesa.get("id", "N/A"),
+                                            "max_personas": max_personas,
+                                            "personas_detectadas": personas_detectadas,
+                                            "asientos_disponibles": asientos_disponibles,
+                                        }
+                                        datos_monitoreo.append(mesa_info)
+
+                                        resumen_ambientes[ambiente_nombre]['personas_detectadas'] += personas_detectadas
+                                        resumen_ambientes[ambiente_nombre]['max_personas'] += max_personas
+                                        resumen_ambientes[ambiente_nombre]['asientos_disponibles'] += asientos_disponibles
+
+    return datos_monitoreo, dict(resumen_ambientes), camaras_configuradas
+
+
+
+
 
 @login_required
 def monitoring_view(request):
-    datos_monitoreo, resumen_ambientes = obtener_datos_monitoreo()  # Llamar a la función correcta
-    return render(request, 'monitoreo.html', {'datos_monitoreo': datos_monitoreo, 'resumen_ambientes': resumen_ambientes})
+    datos_monitoreo, resumen_ambientes, camaras_configuradas = obtener_datos_monitoreo()
+    return render(request, 'monitoreo.html', {
+        'datos_monitoreo': datos_monitoreo,
+        'resumen_ambientes': resumen_ambientes,
+        'camaras_configuradas': camaras_configuradas
+    })
+
+
+

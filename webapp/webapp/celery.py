@@ -17,3 +17,12 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 
 # Load task modules from all registered Django apps.
 app.autodiscover_tasks()
+
+from celery.schedules import crontab
+
+app.conf.beat_schedule = {
+    'check-connection-every-minute': {
+        'task': 'main.tasks.check_connection_task',
+        'schedule': 60.0,  # cada 60 segundos
+    },
+}

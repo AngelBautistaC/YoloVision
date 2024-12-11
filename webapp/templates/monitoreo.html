@@ -6,7 +6,48 @@
 {% block content %}
 <div class="container-fluid mt-4">
 
-    <!-- Resumen de Personas Detectadas por Ambiente -->
+    <h3>Cámaras Configuradas</h3>
+    <table class="table table-striped" id="camaras-configuradas-table">
+        <thead>
+            <tr>
+                <th>Ambiente</th>
+                <th>Piso</th>
+                <th>Cámara</th>
+                <th>Estado</th>
+                <th>Supervisar</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cam in camaras_configuradas %}
+            <tr>
+                <td>{{ cam.ambiente }}</td>
+                <td>{{ cam.piso }}</td>
+                <td>{{ cam.camara }}</td>
+                <td>
+                    {% if cam.connection_state == 'stable' %}
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                    {% elif cam.connection_state == 'reconnecting' %}
+                        <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                        <small>(Intentos: {{ cam.connection_attempts }}/5)</small>
+                    {% elif cam.connection_state == 'failed' %}
+                        <i class="bi bi-x-circle-fill text-danger"></i>
+                        <small>Sin conexión. El sistema seguirá intentando.</small>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if cam.connection_state == 'stable' %}
+                        <a href="/monitoreo/supervisar-camara/{{ cam.uuid }}/" class="btn btn-primary btn-sm">Supervisar</a>
+                    {% else %}
+                        <small>No disponible</small>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <hr class="my-4">
+
     <div class="row">
         <div class="col-12">
             <h3>Resumen de Aforo por Ambiente</h3>
@@ -28,14 +69,12 @@
         </div>
     </div>
 
-    <!-- Botón para mostrar/ocultar la tabla -->
     <div class="row mt-4">
         <div class="col-12 text-center">
             <button id="toggleTableBtn" class="btn btn-primary">Mostrar detalle</button>
         </div>
     </div>
 
-    <!-- Tabla de detalle (oculta inicialmente) -->
     <div class="row mt-4" id="detalle-tabla" style="display: none;">
         <div class="col-12">
             <table class="table table-striped">
@@ -65,12 +104,10 @@
         </div>
     </div>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Función para mostrar u ocultar la tabla de detalle
     document.getElementById('toggleTableBtn').addEventListener('click', function() {
         const detalleTabla = document.getElementById('detalle-tabla');
         if (detalleTabla.style.display === 'none') {
@@ -81,5 +118,6 @@
             this.textContent = 'Mostrar detalle';
         }
     });
+
 </script>
 {% endblock %}
