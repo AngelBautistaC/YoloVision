@@ -23,6 +23,10 @@ from celery.schedules import crontab
 app.conf.beat_schedule = {
     'check-connection-every-minute': {
         'task': 'main.tasks.check_connection_task',
-        'schedule': 60.0,  # cada 60 segundos
+        'schedule': 60.0,  # cada 60 seg chequea conexión
+    },
+    'run-detection-regularly': {
+        'task': 'main.tasks.run_detection_for_configured_cameras',
+        'schedule': 5.0, # cada 5 seg intenta detección en las cámaras en stable si ya pasó su detection_interval
     },
 }

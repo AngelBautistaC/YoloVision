@@ -227,21 +227,21 @@ def iniciar_tracking(request):
         existing_camera_data['mesas'] = polygons
         existing_camera_data['detection_interval'] = detection_interval
         existing_camera_data['status'] = 'configurated'
-        
-        # Si no existen los campos connection_state y connection_attempts, se crean por defecto
         if 'connection_state' not in existing_camera_data:
             existing_camera_data['connection_state'] = 'stable'
         if 'connection_attempts' not in existing_camera_data:
             existing_camera_data['connection_attempts'] = 0
+        if 'last_detection_time' not in existing_camera_data:
+            existing_camera_data['last_detection_time'] = 0
 
         ambiente_nombre = existing_camera_data['ambiente']
         piso = existing_camera_data['piso']
 
         save_camera_data2(ambiente_nombre, piso, camera_uuid, existing_camera_data)
 
-        # Iniciar tarea Celery (opcional)
-        start_detection_task.delay(camera_uuid)
-
+        # Ya no llamamos start_detection_task.delay(camera_uuid)
+        # Las tareas periódicas de celery beat se encargarán.
+        
         return JsonResponse({'success': True, 'camera_uuid': camera_uuid})
 
     return JsonResponse({'error': 'Método no permitido'})
