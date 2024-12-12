@@ -198,3 +198,38 @@ def get_ambientes_and_pisos_from_db():
                 'pisos': pisos,
             })
     return ambientes_data
+
+def delete_camera_from_firebase(camera_uuid):
+    """
+    Elimina una cámara y todas sus subentradas de Firebase, manteniendo las entradas padre.
+
+    Args:
+        camera_uuid (str): El UUID de la cámara a eliminar.
+    """
+    try:
+         # Convertir el UUID a string si es necesario
+        camera_uuid_str = str(camera_uuid)
+         # Referencia a la raíz de los ambientes
+        ref = db.reference('ambientes')
+        snapshot = ref.get()
+        # Recorrer todos los ambientes
+        for ambiente_nombre, ambiente_data in snapshot.items():
+            # Recorrer los pisos dentro de cada ambiente
+            for piso_nombre, piso_data in ambiente_data.get('piso', {}).items():
+                # Recorrer las cámaras dentro de cada piso
+                if isinstance(piso_data, dict):
+                    camaras = piso_data.get('camara', {})
+                    if isinstance(camaras, dict):
+                            for cam_uuid, cam_data in camaras.items():
+                            # Comparar los UUIDs como cadenas
+                                if cam_uuid == camera_uuid_str:
+                                    camera_ref = db.reference(f"ambientes/{ambiente_nombre}/piso/{piso_nombre}/camara/{camera_uuid_str}")
+                                    camera_ref.delete()
+                                    print(f"Cámara con UUID '{camera_uuid_str}' eliminada correctamente de Firebase.")
+                                    return  # Termina la función después de eliminar la cámara
+        print(f"No se encontró cámara con UUID '{camera_uuid_str}' para eliminar en Firebase.")
+
+    except FirebaseError as e:
+        print(f"Error al eliminar la cámara con UUID '{camera_uuid}': {e}")
+    except Exception as e:
+        print(f"Error inesperado al eliminar la cámara con UUID '{camera_uuid}': {e}")

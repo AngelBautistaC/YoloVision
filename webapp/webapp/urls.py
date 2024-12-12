@@ -1,7 +1,7 @@
 
 from django.contrib import admin
 from django.urls import path
-from main.views import access_denied,user_dashboard,operator_dashboard,admin_dashboard,crear_form_view,crear_view,login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas,supervisar_camara,stream_supervisar_camara,obtener_info_mesas_uuid
+from main.views import access_denied, eliminar_camaras,user_dashboard,operator_dashboard,admin_dashboard,crear_form_view,crear_view,login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas,supervisar_camara,stream_supervisar_camara,obtener_info_mesas_uuid
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', login_view, name='login'),
@@ -35,7 +35,7 @@ urlpatterns = [
     path('monitoreo/supervisar-camara/<uuid:camera_uuid>/', supervisar_camara, name='supervisar_camara'),
     path('monitoreo/stream-supervisar-camara/<uuid:camera_uuid>/', stream_supervisar_camara, name='stream_supervisar_camara'),
     path('monitoreo/obtener_info_mesas/<uuid:camera_uuid>/', obtener_info_mesas_uuid, name='obtener_info_mesas_uuid'),
-
+    path('monitoreo/eliminar_camaras/', eliminar_camaras, name='eliminar_camaras'),
 
 
 

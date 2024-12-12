@@ -13,7 +13,7 @@ from shapely.geometry.point import Point
 from ultralytics import YOLO
 import base64
 import math
-from .firebase_helpers import get_camera_by_ip, save_camera_data,get_camera_by_uuid,save_camera_data2,get_ambientes_and_pisos_from_db
+from .firebase_helpers import delete_camera_from_firebase,get_camera_by_ip, save_camera_data,get_camera_by_uuid,save_camera_data2,get_ambientes_and_pisos_from_db
 from .tasks import start_detection_task
 from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
 
@@ -1109,7 +1109,6 @@ def obtener_datos_monitoreo():
 
 
 
-
 @login_required
 def monitoring_view(request):
     datos_monitoreo, resumen_ambientes, camaras_configuradas = obtener_datos_monitoreo()
@@ -1119,5 +1118,24 @@ def monitoring_view(request):
         'camaras_configuradas': camaras_configuradas
     })
 
+@login_required
+def eliminar_camaras(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            camera_uuids = data.get('camera_uuids', [])
 
+            if not camera_uuids:
+                return JsonResponse({'success': False, 'error': 'No se proporcionaron UUIDs de cámara para eliminar.'})
 
+            for camera_uuid in camera_uuids:
+                delete_camera_from_firebase(camera_uuid)
+
+            return JsonResponse({'success': True})
+        
+        except json.JSONDecodeError:
+             return JsonResponse({'success': False, 'error': 'Error al decodificar JSON.'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'Error al eliminar las cámaras: {str(e)}'})
+
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})
