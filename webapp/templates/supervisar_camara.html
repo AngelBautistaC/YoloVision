@@ -31,45 +31,5 @@
 </div>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Firebase configuration
-    var firebaseConfig = {
-        apiKey: "YOUR_API_KEY",  // Replace with your Firebase project config
-        authDomain: "YOUR_AUTH_DOMAIN",
-        databaseURL: "YOUR_DATABASE_URL",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_STORAGE_BUCKET",
-        messagingSenderId: "YOUR_MSG_SENDER_ID",
-        appId: "YOUR_APP_ID"
-    };
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
 
-    const tableBody = document.querySelector('#table-mesas tbody');
-    const cameraUuid = "{{ camera_uuid }}";
-
-    function updateTableData() {
-        var mesasRef = firebase.database().ref('cameras/' + cameraUuid + '/mesas');
-        mesasRef.on('value', (snapshot) => {
-            const mesas = snapshot.val();
-            tableBody.innerHTML = '';
-            for (let key in mesas) {
-                const mesa = mesas[key];
-                const row = `
-                    <tr>
-                        <td>${mesa.label}</td>
-                        <td>${mesa.max_personas}</td>
-                        <td>${mesa.personas_Detectadas || 0}</td>
-                    </tr>
-                `;
-                tableBody.innerHTML += row;
-            }
-        });
-    }
-
-    // Initial call
-    updateTableData();
-});
-</script>
 {% endblock %}

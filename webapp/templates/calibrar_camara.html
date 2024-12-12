@@ -134,7 +134,7 @@
 
 {% elif step == '3' %}
 <h3>Paso 3: Obtención de pixels por metro</h3>
-<p id="capture-instructions">Capture 5 imágenes con el ArUco cerca y 30 imágenes con el ArUco lejos.</p>
+<p id="capture-instructions">Capture 1 imágen con el ArUco cerca y 1 imágen con el ArUco lejos.</p>
 <div class="row">
     <div class="col-md-6">
         <div id="stream-container">
@@ -145,8 +145,8 @@
         <button id="capture-near-btn" class="btn btn-primary mb-2">Capturar cerca</button>
         <button id="capture-far-btn" class="btn btn-primary mb-2">Capturar lejos</button>
         <button id="calculate-btn" class="btn btn-success mb-2" disabled>Calcular pixels por metro</button>
-        <p id="capture-count-near">Capturas cerca: 0/5</p>
-        <p id="capture-count-far">Capturas lejos: 0/5</p>
+        <p id="capture-count-near">Capturas cerca: 0/1</p>
+        <p id="capture-count-far">Capturas lejos: 0/1</p>
         <div id="calculation-result" style="display: none;">
             <h4>Resultado:</h4>
             <p id="pixels-per-meter"></p>
@@ -180,12 +180,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateCaptureCount(isNear, count) {
     if (isNear) {
         capturesNear = count;
-        captureCountNear.textContent = `Capturas cerca: ${capturesNear}/5`;
+        captureCountNear.textContent = `Capturas cerca: ${capturesNear}`;
     } else {
         capturesFar = count;
-        captureCountFar.textContent = `Capturas lejos: ${capturesFar}/5`;
+        captureCountFar.textContent = `Capturas lejos: ${capturesFar}`;
     }
-    calculateBtn.disabled = !(capturesNear >= 5 && capturesFar >= 5);
+    calculateBtn.disabled = !(capturesNear >= 1 && capturesFar >= 1);
 }
 
     function captureImage(isNear) {

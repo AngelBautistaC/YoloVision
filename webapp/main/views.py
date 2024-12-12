@@ -795,10 +795,10 @@ def calibrar_camara_paso3(request):
             pixels_per_meter_near = request.session.get('pixels_per_meter_near', [])
             pixels_per_meter_far = request.session.get('pixels_per_meter_far', [])
 
-            if len(pixels_per_meter_near) < 5 or len(pixels_per_meter_far) < 5:
-                return JsonResponse({'success': False, 'message': 'Se necesitan al menos 5 capturas para cada distancia'})
+            if len(pixels_per_meter_near) <1 or len(pixels_per_meter_far) < 1:
+                return JsonResponse({'success': False, 'message': 'Se necesitan al menos 1 capturas para cada distancia'})
 
-            pixels_per_meter = np.mean(pixels_per_meter_near[:5] + pixels_per_meter_far[:5])
+            pixels_per_meter = np.mean(pixels_per_meter_near[:1] + pixels_per_meter_far[:1])
 
             request.session['pixels_per_meter'] = pixels_per_meter
 
