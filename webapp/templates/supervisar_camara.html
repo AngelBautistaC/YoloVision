@@ -4,20 +4,30 @@
 <div class="container mt-5">
     <h2>Supervisar Cámara</h2>
     <div class="row">
-        <div class="col-md-6">
+        <div class="col-md-12">
             <h3>{{ camera.label }}</h3>
             <p>Ambiente: {{ ambiente }}</p>
             <p>Piso: {{ piso }}</p>
-            <div id="video-container">
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-8">
+           <div id="video-container">
                 <img id="video-stream" src="{% url 'stream_supervisar_camara' camera_uuid=camera_uuid %}" alt="Video stream" style="width: 100%; height: auto;">
             </div>
         </div>
-        <div class="col-md-6">
-            <h3>Información de Mesas</h3>
+        <div class="col-md-4">
+        </div>
+    </div>
+    <div class="row mt-4">
+        <div class="col-md-12">
+           <h3>Información de Mesas</h3>
             <table class="table" id="table-mesas">
                 <thead>
                     <tr>
                         <th>Etiqueta</th>
+                        <th>Perímetro (m)</th>
+                        <th>Área (m²)</th>
                         <th>Máx. Personas</th>
                         <th>Personas Detectadas</th>
                     </tr>
@@ -31,5 +41,39 @@
 </div>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+    const cameraUUID = '{{ camera_uuid }}'; // Get camera_uuid from Django context
+     function fetchTableData() {
+                fetch(`/monitoreo/obtener_info_mesas/${cameraUUID}/`)
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector('#table-mesas tbody');
+                    tableBody.innerHTML = ''; // Clear existing table rows
+                    data.mesas.forEach(mesa => {
+                        const row = `
+                            <tr>
+                                <td>${mesa.label}</td>
+                                <td>${mesa.perimeter ? mesa.perimeter.toFixed(2) : 'N/A'}</td>
+                                <td>${mesa.area ? mesa.area.toFixed(2) : 'N/A'}</td>
+                                <td>${mesa.max_personas}</td>
+                                <td>${mesa.personas_Detectadas}</td>
+                            </tr>
+                        `;
+                         tableBody.innerHTML += row;
+                    });
+                })
+                   .catch(error => {
+                    console.error("Error al obtener datos de la mesa:", error);
+                     });
+        }
+
+     // Initial fetch
+    fetchTableData();
+
+    // Set interval for periodic fetching
+        setInterval(fetchTableData, 3000); // Fetch every 3 seconds
+    });
+</script>
 
 {% endblock %}
