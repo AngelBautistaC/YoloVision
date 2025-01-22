@@ -1,7 +1,7 @@
 
 from django.contrib import admin
 from django.urls import path
-from main.views import access_denied, eliminar_camaras,user_dashboard,operator_dashboard,admin_dashboard,crear_form_view,crear_view,login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas,supervisar_camara,stream_supervisar_camara,obtener_info_mesas_uuid
+from main.views import admin_logs,access_denied, eliminar_camaras,user_dashboard,operator_dashboard,admin_dashboard,crear_form_view,crear_view,login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas,supervisar_camara,stream_supervisar_camara,obtener_info_mesas_uuid
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', login_view, name='login'),
@@ -12,6 +12,7 @@ urlpatterns = [
     path('configuracion/', configuracion_view, name='configuracion'),
     path('logout/', login_view, name='logout'),
     path('admin_dashboard/', admin_dashboard, name='admin_dashboard'),
+    path('admin/logs/', admin_logs, name='admin_logs'),
     path('operator_dashboard/', operator_dashboard, name='operator_dashboard'),
     path('user_dashboard/', user_dashboard, name='user_dashboard'),
     path('access_denied/', access_denied, name='access_denied'), 

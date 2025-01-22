@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'bootstrap5',
     'main.apps.MainConfig',
+    'logger'
 
 ]
 
@@ -100,8 +101,11 @@ LOGGING = {
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'djongo',
+        'NAME': 'logs_db', # Elige un nombre para tu base de datos (ej. 'my_logs_db')
+        'CLIENT': {
+            'host': 'mongodb://localhost:27017/'  # O la URL de tu servidor MongoDB si es diferente
+        }
     }
 }
 
@@ -130,7 +134,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Lima'
 
 USE_I18N = True
 

@@ -46,6 +46,10 @@ from functools import wraps
 from django.shortcuts import redirect
 from django.conf import settings
 
+
+from logger.utils import create_log_entry
+
+
 def role_required(allowed_roles=[]):
     """
     Decorador para vistas que verifica si el usuario tiene uno de los roles permitidos.
@@ -540,6 +544,7 @@ def quitar_poligono(request):
 
 JSON_FILE_PATH = os.path.join(settings.BASE_DIR, 'data', 'database.json')
 
+
 def login_view(request):
     if request.method == 'POST':
         form = LoginForm(request.POST)
@@ -549,9 +554,13 @@ def login_view(request):
             user, role = authenticate_firebase_user(email, password)
 
             if user:
-                # Set session data and create Django User instance if it doesn't exist
-                django_user, created = User.objects.get_or_create(username=user.uid)
-                django_user.is_staff = role == 'administrator'  # Corrected role check
+                # Store user's email in session
+                request.session['user_email'] = user.email
+                request.session.save()  # Guardar la sesión explícitamente
+
+                # Create Django User instance if it doesn't exist
+                django_user, created = User.objects.get_or_create(username=user.email)
+                django_user.is_staff = role == 'administrator'
                 django_user.save()
 
                 # Log in the user to establish session
@@ -559,6 +568,9 @@ def login_view(request):
 
                 # Store the user's role in the session
                 request.session['user_role'] = role
+
+                # Log the login action
+                create_log_entry(request, 'Inicio de sesión', f'Usuario: {user.email}')
 
                 # Redirect based on role
                 if role == 'operator':
@@ -573,7 +585,6 @@ def login_view(request):
         form = LoginForm()
 
     return render(request, 'login.html', {'form': form})
-
 
 
 @login_required
@@ -1139,3 +1150,26 @@ def eliminar_camaras(request):
             return JsonResponse({'success': False, 'error': f'Error al eliminar las cámaras: {str(e)}'})
 
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+##Seccion Logs:
+# ... otros imports ...
+from django.contrib.auth.decorators import login_required, user_passes_test
+from logger.views import log_view
+from django.http import HttpRequest
+
+@login_required
+@role_required(allowed_roles=['operator', 'administrator'])
+def admin_logs(request):
+    # Crear un nuevo request que es una copia del original
+    log_request = HttpRequest()
+    log_request.method = 'GET'
+    log_request.user = request.user
+    log_request.META = request.META
+    log_request.GET = request.GET
+
+    # Llamar a la vista log_view pasándole el nuevo request
+    log_response = log_view(log_request)
+
+    return render(request, 'admin_logs.html', {
+        'log_content': log_response.content.decode()  # Decodificar el contenido
+    })
