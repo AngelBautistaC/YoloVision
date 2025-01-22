@@ -243,6 +243,8 @@ def iniciar_tracking(request):
 
         save_camera_data2(ambiente_nombre, piso, camera_uuid, existing_camera_data)
 
+        create_log_entry(request, 'Configurar Cámara', f'Finalizó la configuración de la cámara con IP: {ip_url}')
+
         # Ya no llamamos start_detection_task.delay(camera_uuid)
         # Las tareas periódicas de celery beat se encargarán.
         
@@ -830,6 +832,7 @@ def calibrar_camara_paso3(request):
 
             # Guardar en Firebase
             save_camera_data(ambiente, piso, camera_uuid, camera_data)
+            create_log_entry(request, 'Calibrar Cámara', f'Finalizó la calibración en la cámara con IP: {ip_port}')
 
             # # Limpiar la sesión si es necesario
             # calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
@@ -1134,22 +1137,29 @@ def eliminar_camaras(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            camera_uuids = data.get('camera_uuids', [])
+            cameras_data = data.get('cameras', [])  # Cambiado de 'camera_uuids' a 'cameras'
 
-            if not camera_uuids:
-                return JsonResponse({'success': False, 'error': 'No se proporcionaron UUIDs de cámara para eliminar.'})
+            if not cameras_data:
+                return JsonResponse({'success': False, 'error': 'No se proporcionaron datos de cámaras para eliminar.'})
 
-            for camera_uuid in camera_uuids:
+            for camera in cameras_data:
+                camera_uuid = camera.get('uuid')
+                ambiente = camera.get('ambiente')
+                piso = camera.get('piso')
+                camera_name = camera.get('name')
+
                 delete_camera_from_firebase(camera_uuid)
+                create_log_entry(request, 'Eliminar cámara', f'Cámara eliminada: {camera_name}, Ambiente: {ambiente}, Piso: {piso}, UUID: {camera_uuid}')
 
             return JsonResponse({'success': True})
-        
+
         except json.JSONDecodeError:
-             return JsonResponse({'success': False, 'error': 'Error al decodificar JSON.'})
+            return JsonResponse({'success': False, 'error': 'Error al decodificar JSON.'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': f'Error al eliminar las cámaras: {str(e)}'})
 
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
 
 ##Seccion Logs:
 # ... otros imports ...

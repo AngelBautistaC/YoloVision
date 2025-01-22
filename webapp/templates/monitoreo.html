@@ -108,8 +108,7 @@
         </div>
     </div>
   
-  <!-- Modal de Confirmación -->
-    <div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
+  <div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -147,39 +146,48 @@
     const selectAllCheckbox = document.getElementById('select-all-cameras');
     const cameraCheckboxes = document.querySelectorAll('.camera-checkbox');
     const alertContainer = document.getElementById('alert-container');
-    let selectedCameras = new Set(); // Use a Set to store selected UUIDs
+    let selectedCameras = new Set();
 
     function updateAlert() {
         if (selectedCameras.size > 0) {
-        const cameraCount = selectedCameras.size;
-        const alertHtml = `
-            <div class="alert alert-info d-flex justify-content-between align-items-center" role="alert">
-            <div>Seleccionando ${cameraCount} cámara${cameraCount > 1 ? 's' : ''}</div>
-            <button type="button" class="btn btn-danger btn-sm delete-selected-btn">Eliminar</button>
-            </div>
+            const cameraCount = selectedCameras.size;
+            const alertHtml = `
+                <div class="alert alert-info d-flex justify-content-between align-items-center" role="alert">
+                    <div>Seleccionando ${cameraCount} cámara${cameraCount > 1 ? 's' : ''}</div>
+                    <button type="button" class="btn btn-danger btn-sm delete-selected-btn">Eliminar</button>
+                </div>
             `;
-        alertContainer.innerHTML = alertHtml;
-        // Asigna el listener al botón de eliminar dinámicamente
-        const deleteButton = document.querySelector('.delete-selected-btn');
-            if (deleteButton){
+            alertContainer.innerHTML = alertHtml;
+            const deleteButton = document.querySelector('.delete-selected-btn');
+            if (deleteButton) {
                 deleteButton.addEventListener('click', openDeleteConfirmationModal);
             }
-
         } else {
-            alertContainer.innerHTML = ''; // Limpiar el alert si no hay cámaras seleccionadas
+            alertContainer.innerHTML = '';
         }
     }
 
+    function openDeleteConfirmationModal() {
+        const cameraNames = [];
+        const cameraData = []; 
 
-    function openDeleteConfirmationModal(){
-         const cameraNames = [];
         selectedCameras.forEach(uuid => {
             const row = document.querySelector(`tr[data-uuid="${uuid}"]`);
-            if(row){
+            if (row) {
                 const cameraName = row.querySelector('td:nth-child(4)').textContent;
+                const ambiente = row.querySelector('td:nth-child(2)').textContent;
+                const piso = row.querySelector('td:nth-child(3)').textContent;
                 cameraNames.push(cameraName);
+                cameraData.push({
+                    uuid: uuid,
+                    name: cameraName,
+                    ambiente: ambiente,
+                    piso: piso
+                });
             }
         });
+
+        
         const modalBody = document.getElementById('camera-names-list');
         modalBody.innerHTML = '';
         cameraNames.forEach(name => {
@@ -187,92 +195,78 @@
             li.textContent = name;
             modalBody.appendChild(li);
         });
+
         
         const modal = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
         modal.show();
-    }
 
+        
+        document.getElementById('confirm-delete-btn').onclick = () => {
+            deleteSelectedCameras(cameraData); 
+            modal.hide();
+        };
+    }
 
     selectAllCheckbox.addEventListener('change', function() {
         selectedCameras.clear();
         cameraCheckboxes.forEach(checkbox => {
-        checkbox.checked = this.checked;
-        if(this.checked){
-            selectedCameras.add(checkbox.value)
-        }
-    });
+            checkbox.checked = this.checked;
+            if (this.checked) {
+                selectedCameras.add(checkbox.value);
+            }
+        });
         updateAlert();
     });
-
 
     cameraCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
-        if (this.checked) {
-            selectedCameras.add(this.value);
-        } else {
-            selectedCameras.delete(this.value);
-            selectAllCheckbox.checked = false;
-        }
-        updateAlert();
+            if (this.checked) {
+                selectedCameras.add(this.value);
+            } else {
+                selectedCameras.delete(this.value);
+                selectAllCheckbox.checked = false;
+            }
+            updateAlert();
+        });
     });
-    });
-    
-    // Listener para el boton eliminar dentro del modal
-    document.getElementById('confirm-delete-btn').addEventListener('click', function() {
-        deleteSelectedCameras();
-    });
-    
-    function deleteSelectedCameras() {
-        const cameraUUIDs = Array.from(selectedCameras);
 
-         fetch('/monitoreo/eliminar_camaras/', {
+    function deleteSelectedCameras(cameraData) {
+        fetch('/monitoreo/eliminar_camaras/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: JSON.stringify({ camera_uuids: cameraUUIDs })
+            body: JSON.stringify({ cameras: cameraData }) 
         })
         .then(response => response.json())
         .then(response => {
-              if (response.success) {
-                    // Success: Update UI, remove rows
-                    cameraUUIDs.forEach(uuid => {
-                        const row = document.querySelector(`tr[data-uuid="${uuid}"]`);
-                        if (row) {
-                            row.remove(); // Remove row from the table
-                        }
-                    });
+            if (response.success) {
+                cameraData.forEach(cam => {
+                    const row = document.querySelector(`tr[data-uuid="${cam.uuid}"]`);
+                    if (row) {
+                        row.remove();
+                    }
+                });
                 selectedCameras.clear();
                 updateAlert();
-
-                    // Opcional: Mostrar un mensaje de éxito
-                    alert('Cámaras eliminadas exitosamente');
-
-                    // Cierra el modal
-                     const modalElement = document.getElementById('deleteConfirmationModal');
-                    const modal = bootstrap.Modal.getInstance(modalElement);
-                    modal.hide();
-                    
-                } else {
-                    // Handle failure
-                    alert('Error al eliminar cámaras: ' + response.error);
-                }
-
+                alert('Cámaras eliminadas exitosamente');
+            } else {
+                alert('Error al eliminar cámaras: ' + response.error);
+            }
         })
-         .catch(error => {
-                console.error("Error AJAX:", error);
-                 // Handle failure
-                alert('Error al eliminar cámaras: ' + error);
-            });
+        .catch(error => {
+            console.error("Error AJAX:", error);
+            alert('Error al eliminar cámaras: ' + error);
+        });
     }
+
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
             const cookies = document.cookie.split(';');
             for (let i = 0; i < cookies.length; i++) {
                 const cookie = cookies[i].trim();
-                // Does this cookie string begin with the name we want?
                 if (cookie.startsWith(name + '=')) {
                     cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
                     break;
