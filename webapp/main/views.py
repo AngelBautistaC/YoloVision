@@ -49,6 +49,10 @@ from django.conf import settings
 
 from logger.utils import create_log_entry
 
+from logger.views import log_view
+
+from logger.models import LogEntry
+
 
 def role_required(allowed_roles=[]):
     """
@@ -1162,24 +1166,9 @@ def eliminar_camaras(request):
 
 
 ##Seccion Logs:
-# ... otros imports ...
-from django.contrib.auth.decorators import login_required, user_passes_test
-from logger.views import log_view
-from django.http import HttpRequest
 
 @login_required
-@role_required(allowed_roles=['operator', 'administrator'])
+@role_required(allowed_roles=['administrator'])  # Asegúrate de que solo los administradores puedan acceder
 def admin_logs(request):
-    # Crear un nuevo request que es una copia del original
-    log_request = HttpRequest()
-    log_request.method = 'GET'
-    log_request.user = request.user
-    log_request.META = request.META
-    log_request.GET = request.GET
-
-    # Llamar a la vista log_view pasándole el nuevo request
-    log_response = log_view(log_request)
-
-    return render(request, 'admin_logs.html', {
-        'log_content': log_response.content.decode()  # Decodificar el contenido
-    })
+    logs = LogEntry.objects.all().order_by('-timestamp')
+    return render(request, 'admin_logs.html', {'logs': logs})

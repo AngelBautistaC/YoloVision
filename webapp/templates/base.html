@@ -143,7 +143,6 @@
 </head>
 <body>
     <div class="d-flex" id="wrapper">
-        <!-- Sidebar -->
         <div id="sidebar-wrapper">
             <div class="sidebar-heading">
                 <img src="{% static 'images/cabeceraPUCP.png' %}" alt="PUCP Logo">
@@ -170,7 +169,6 @@
                 </li>
             </ul>
         </div>
-        <!-- Page Content -->
         <div id="page-content-wrapper">
             <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
                 <div class="container-fluid">
@@ -181,8 +179,7 @@
                         <a class="navbar-brand mb-0 ms-3" href="#">{% block page_title %}Monitoreo{% endblock %}</a>
                     </div>
                     <div class="ms-auto me-3">
-                        <!-- If needed, info on the right side corner of the navbar. -->
-                    </div>
+                        </div>
                 </div>
             </nav>
             <div class="container-fluid">
@@ -206,30 +203,6 @@
             e.preventDefault();
             toggleSidebar();
         });
-        function handleOutsideClick(event) {
-    var sidebar = document.getElementById('sidebar-wrapper');
-    var toggleBtn = document.getElementById('menu-toggle');
-    var wrapper = document.getElementById("wrapper");
-    var isClickInside = sidebar.contains(event.target) || toggleBtn.contains(event.target);
-
-    if (!isClickInside) {
-        if (window.innerWidth <= 768) {
-            // Lógica para dispositivos móviles
-            if (sidebar.classList.contains('active')) {
-                toggleSidebar();
-            }
-        } else {
-            // Lógica para dispositivos de escritorio
-            if (!wrapper.classList.contains("toggled")) {
-                toggleSidebar();
-            }
-        }
-    }
-}
-
-// Agregar event listeners para click y touch
-document.addEventListener('click', handleOutsideClick);
-document.addEventListener('touchstart', handleOutsideClick);
     </script>
     {% block extra_js %}{% endblock %}
 </body>
