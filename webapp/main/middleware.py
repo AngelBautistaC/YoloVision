@@ -1,4 +1,9 @@
 from django.shortcuts import redirect
+from django.urls import reverse
+from django.contrib import messages
+from django.http import HttpResponseRedirect
+from firebase_admin import db
+from firebase_admin import auth, firestore
 
 class CalibrationMiddleware:
     def __init__(self, get_response):
@@ -27,15 +32,40 @@ class CalibrationMiddleware:
         return response
 
 
-# Example of adding an is_admin attribute in a custom middleware
+
+
 class RoleMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
+        response = self.get_response(request)
+
         if request.user.is_authenticated:
-            # Assuming role is stored in Firebase Realtime Database under /users/<uid>/role
-            user_ref = db.reference(f'/users/{request.user.username}/role')
-            role = user_ref.get()
-            request.user.is_admin = (role == 'admin')
-        return self.get_response(request)
+            # Obtener el UID del usuario autenticado
+            try:
+                decoded_token = auth.verify_id_token(request.COOKIES.get('firebase_token')) # Suponiendo que guardas el token de Firebase en una cookie
+                uid = decoded_token['uid']
+
+                # Autenticar al usuario con el UID
+                user = auth.get_user(uid)
+
+                # Forzar la actualización de la sesión con el rol desde Firebase
+                firestore_client = firestore.client()
+                user_data = firestore_client.collection('users').document(user.uid).get()
+                if user_data.exists:
+                    role = user_data.to_dict().get('role', 'user')
+                    request.session['user_role'] = role
+                    request.session.modified = True  # Forzar actualización de la sesión
+                    print(f"RoleMiddleware: Usuario {request.user.username}, Rol actualizado en sesión: {role}")  # <-- Depuración
+                else:
+                    print(f"RoleMiddleware: No se encontró el rol para el usuario {request.user.username}")
+
+            except auth.InvalidIdTokenError:
+                print("RoleMiddleware: Token de Firebase inválido.")
+            except auth.UserNotFoundError:
+                print("RoleMiddleware: Usuario no encontrado en Firebase.")
+            except Exception as e:
+                print(f"RoleMiddleware: Error al obtener el rol: {e}")
+
+        return response

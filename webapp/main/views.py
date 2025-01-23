@@ -53,6 +53,11 @@ from logger.views import log_view
 
 from logger.models import LogEntry
 
+from django.urls import reverse # Para el middleware
+
+
+from django.contrib.auth import logout
+from django.views.decorators.cache import never_cache
 
 def role_required(allowed_roles=[]):
     """
@@ -71,23 +76,6 @@ def role_required(allowed_roles=[]):
     return decorator
 
 
-@login_required
-@role_required(allowed_roles=['administrator'])
-def admin_dashboard(request):
-
-    return render(request, 'admin_dashboard.html')
-   
-
-@login_required
-@role_required(allowed_roles=['operator'])
-def operator_dashboard(request):
-    
-    return render(request, 'operator_dashboard.html')
-    
-
-@login_required
-def user_dashboard(request):
-    return render(request, 'user_dashboard.html')
 
 # views.py
 
@@ -551,7 +539,18 @@ def quitar_poligono(request):
 JSON_FILE_PATH = os.path.join(settings.BASE_DIR, 'data', 'database.json')
 
 
+
+def logout_view(request):
+    logout(request)
+    return redirect('login')
+
+
+
 def login_view(request):
+
+    if request.user.is_authenticated:
+        return redirect('monitoreo')  # Redirige a la página de monitoreo si ya está logueado
+
     if request.method == 'POST':
         form = LoginForm(request.POST)
         if form.is_valid():
@@ -568,23 +567,15 @@ def login_view(request):
                 django_user, created = User.objects.get_or_create(username=user.email)
                 django_user.is_staff = role == 'administrator'
                 django_user.save()
-
-                # Log in the user to establish session
                 login(request, django_user)
-
-                # Store the user's role in the session
                 request.session['user_role'] = role
+                request.session.modified = True  # Forzar actualización de la sesión
+                request.session.save()  # Guardar la sesión explícitamente
+                print(f"login_view: Rol guardado en sesión: {role}") # <-- Depuración
 
-                # Log the login action
                 create_log_entry(request, 'Inicio de sesión', f'Usuario: {user.email}')
-
-                # Redirect based on role
-                if role == 'operator':
-                    return redirect('operator_dashboard')
-                elif role == 'user':
-                    return redirect('user_dashboard')
-                elif role == 'administrator':
-                    return redirect('admin_dashboard')
+                next_url = request.session.pop('next_url', None)
+                return redirect(next_url or 'monitoreo')
             else:
                 messages.error(request, 'Invalid credentials. Please try again.')
     else:
@@ -592,9 +583,8 @@ def login_view(request):
 
     return render(request, 'login.html', {'form': form})
 
-
 @login_required
-@role_required(allowed_roles=['operator', 'administrator'])
+#@role_required(allowed_roles=['operator', 'administrator'])
 def configuracion_view(request):
     # Limpiar datos de calibración previos
     calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints',
@@ -680,7 +670,7 @@ logger = logging.getLogger(__name__)
 
 
 @login_required
-@role_required(allowed_roles=['operator', 'administrator'])
+#@role_required(allowed_roles=['operator', 'administrator'])
 def calibrar_camara_paso1(request):
     # Limpiar datos de calibración previos
     calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
@@ -750,7 +740,7 @@ def calibrar_camara_paso1(request):
 
 
 @login_required
-@role_required(allowed_roles=['operator', 'administrator'])
+#@role_required(allowed_roles=['operator', 'administrator'])
 def calibrar_camara_paso3(request):
     context = {'step': '3'}
     ip_port = request.session.get('ip_port')
@@ -919,7 +909,7 @@ def camera_stream(request):
 
 
 @login_required
-@role_required(allowed_roles=['operator', 'administrator'])
+#@role_required(allowed_roles=['operator', 'administrator'])
 def calibrar_camara_paso_final(request):
     # Verificar si se ha completado el paso 3
     if not request.session.get('pixels_per_meter'):
@@ -1126,15 +1116,18 @@ def obtener_datos_monitoreo():
 
 
 
-
+@never_cache
 @login_required
 def monitoring_view(request):
+    print(f"monitoring_view: Rol en la sesión: {request.session.get('user_role')}") # <-- Depuración
     datos_monitoreo, resumen_ambientes, camaras_configuradas = obtener_datos_monitoreo()
     return render(request, 'monitoreo.html', {
         'datos_monitoreo': datos_monitoreo,
         'resumen_ambientes': resumen_ambientes,
         'camaras_configuradas': camaras_configuradas
     })
+
+
 
 @login_required
 def eliminar_camaras(request):

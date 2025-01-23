@@ -1,24 +1,21 @@
-    # firebase_helpers.py
+# firebase_helpers.py
 import firebase_admin
 from firebase_admin import db
-from firebase_admin import auth, firestore
+from firebase_admin import auth, credentials, firestore
 from firebase_admin.exceptions import FirebaseError
 from django.contrib.auth import authenticate, login
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth.models import User  # Local Django User for session handling
-
-
-import firebase_admin
-from firebase_admin import auth, db
 from django.conf import settings
-from . import firebase_config  # Ensure Firebase is initialized
 import requests
-
 
 # Initialize Firebase Admin SDK if not already initialized
 if not firebase_admin._apps:
-    cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)  # Path to your Firebase service account key
-    firebase_admin.initialize_app(cred)
+    cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': settings.FIREBASE_DATABASE_URL
+    })
+
 
 def get_camera_by_ip(ip_url):
     # Referencia a la raíz de los ambientes
@@ -48,7 +45,7 @@ def get_camera_by_ip(ip_url):
     # Si no se encontró la cámara, retornar None, None
     return None, None
 
-def get_camera_by_uuid(camera_uuid): 
+def get_camera_by_uuid(camera_uuid):
     # Convertir el UUID a string si es necesario
     camera_uuid_str = str(camera_uuid)
 
@@ -72,9 +69,9 @@ def get_camera_by_uuid(camera_uuid):
     return None
 
 def save_camera_data(ambiente_nombre, piso, camera_uuid, camera_data):
- 
+
     camera_ref = db.reference(f"ambientes/{ambiente_nombre}/piso/{piso}/camara/{camera_uuid}")
-    
+
     # Guardar los datos de la cámara
     camera_ref.set(camera_data)
 
@@ -85,7 +82,7 @@ def save_camera_data(ambiente_nombre, piso, camera_uuid, camera_data):
 
 def save_camera_data2(ambiente_nombre, piso, camera_uuid, camera_data):
     camera_ref = db.reference(f"ambientes/{ambiente_nombre}/piso/{piso}/camara/{camera_uuid}")
-    
+
     # Guardar los datos de la cámara
     camera_ref.set(camera_data)
 
@@ -127,13 +124,13 @@ def create_user_in_firebase(username, email, password, role):
         print(f"Error creating user in Firebase: {e}")
     return None
 
-FIREBASE_API_KEY ="AIzaSyCL9vshBD4m6BktNo7ku47o3da29Qp6sRQ"
+FIREBASE_API_KEY = 'AIzaSyCL9vshBD4m6BktNo7ku47o3da29Qp6sRQ'
 def authenticate_firebase_user(email, password):
     """
     Authenticates user using Firebase email and password authentication.
     """
     url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
-    
+
     payload = {
         "email": email,
         "password": password,
@@ -143,23 +140,32 @@ def authenticate_firebase_user(email, password):
     try:
         response = requests.post(url, json=payload)
         response_data = response.json()
-        
+
         if "error" in response_data:
             print(f"Firebase Authentication Error: {response_data['error']['message']}")
             return None, None
-        
-        # Assuming role is retrieved from Firebase's custom claims, or you can store it in Firestore
+
+        # Get the user from Firebase Authentication to retrieve the UID
         user = auth.get_user_by_email(email)
+        print(f"authenticate_firebase_user: User UID: {user.uid}") # <-- Depuración
+
+        # Retrieve the user's role from Firestore using the UID
         firestore_client = firestore.client()
         user_data = firestore_client.collection('users').document(user.uid).get()
-        
+
         if user_data.exists:
             role = user_data.to_dict().get('role', 'user')  # Default to 'user' if no role
+            print(f"authenticate_firebase_user: Usuario {email}, Rol encontrado en Firestore: {role}") # <-- Depuración
             return user, role
-        return None, None
+        else:
+            print(f"authenticate_firebase_user: User data not found in Firestore for UID: {user.uid}")
+            return None, None
 
     except requests.RequestException as e:
         print(f"Request error: {e}")
+        return None, None
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
         return None, None
 
 def save_user_to_firebase(email, role):

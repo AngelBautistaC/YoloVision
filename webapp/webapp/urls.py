@@ -1,8 +1,9 @@
-
 from django.contrib import admin
 from django.urls import path
-from main.views import admin_logs,access_denied, eliminar_camaras,user_dashboard,operator_dashboard,admin_dashboard,crear_form_view,crear_view,login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas,supervisar_camara,stream_supervisar_camara,obtener_info_mesas_uuid
+from django.contrib.auth import views as auth_views # Importar las vistas de autenticación de Django
+from main.views import logout_view,admin_logs,access_denied, eliminar_camaras,crear_form_view,crear_view,login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas,supervisar_camara,stream_supervisar_camara,obtener_info_mesas_uuid
 urlpatterns = [
+    path('logout/', logout_view, name='logout'),
     path('admin/', admin.site.urls),
     path('', login_view, name='login'),
     path('login/', login_view, name='login'),
@@ -10,16 +11,11 @@ urlpatterns = [
     path('crear/', crear_view, name='crear'),
     path('crear_form/', crear_form_view, name='crear_form'),
     path('configuracion/', configuracion_view, name='configuracion'),
-    path('logout/', login_view, name='logout'),
-    path('admin_dashboard/', admin_dashboard, name='admin_dashboard'),
+    path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'), # Usar la vista de logout de Django
     path('admin/logs/', admin_logs, name='admin_logs'),
-    path('operator_dashboard/', operator_dashboard, name='operator_dashboard'),
-    path('user_dashboard/', user_dashboard, name='user_dashboard'),
     path('access_denied/', access_denied, name='access_denied'), 
-    #path('configuracion/calibrar/',calibrar_camara, name='calibrar_camara'),
     path('camera_stream/', camera_stream, name='camera_stream'),
     path('configuracion/calibrar/paso1/', calibrar_camara_paso1, name='calibrar_camara_paso1'),
-    # path('configuracion/calibrar/paso2/', calibrar_camara_paso2, name='calibrar_camara_paso2'),
     path('configuracion/calibrar/paso3/', calibrar_camara_paso3, name='calibrar_camara_paso3'),
     path('configuracion/calibrar/final/', calibrar_camara_paso_final, name='calibrar_camara_paso_final'),
     path('configuracion/configurar-deteccion/', configurar_deteccion, name='configurar_deteccion'),
@@ -37,7 +33,4 @@ urlpatterns = [
     path('monitoreo/stream-supervisar-camara/<uuid:camera_uuid>/', stream_supervisar_camara, name='stream_supervisar_camara'),
     path('monitoreo/obtener_info_mesas/<uuid:camera_uuid>/', obtener_info_mesas_uuid, name='obtener_info_mesas_uuid'),
     path('monitoreo/eliminar_camaras/', eliminar_camaras, name='eliminar_camaras'),
-
-
-
 ]

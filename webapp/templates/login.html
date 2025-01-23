@@ -122,4 +122,22 @@
 </div>
 
 </body>
+
+<script>
+    // Asegúrate de que esto se ejecute después de que la autenticación de Firebase haya tenido lugar
+    firebase.auth().onAuthStateChanged(function(user) {
+      if (user) {
+        // El usuario está autenticado, obtén el token de ID de Firebase
+        user.getIdToken().then(function(idToken) {
+          // Establece el token de ID de Firebase en una cookie
+          document.cookie = "firebase_token=" + idToken + ";path=/";
+          // Ahora puedes recargar la página o redirigir al usuario
+          location.reload(); // O redirigir a una URL específica
+        }).catch(function(error) {
+          // Manejar errores aquí
+          console.error("Error al obtener el token de ID:", error);
+        });
+      }
+    });
+</script>
 </html>
