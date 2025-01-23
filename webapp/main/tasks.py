@@ -7,6 +7,8 @@ from firebase_admin import db
 from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
 from ultralytics import YOLO
 import cv2
+from django.http import HttpRequest
+from logger.utils import create_log_entry, create_celery_log_entry
 
 def test_camera_connection(ip_url):
     cap = cv2.VideoCapture(ip_url)
@@ -140,7 +142,6 @@ def start_detection_task(camera_uuid):
         cap.release()
         time.sleep(detection_interval)
 
-
 @shared_task
 def check_connection_task():
     ambientes_ref = db.reference('/ambientes')
@@ -155,28 +156,33 @@ def check_connection_task():
                 if cam_data.get('status') == 'configurated':
                     connection_state = cam_data.get('connection_state', 'stable')
                     connection_attempts = cam_data.get('connection_attempts', 0)
-                    ip_url = cam_data['ip_url']
+                    ip_url = cam_data.get('ip_url')
+                    cam_label = cam_data.get('label', 'N/A')
 
                     if connection_state == 'stable':
                         if not test_camera_connection(ip_url):
                             cam_data['connection_state'] = 'reconnecting'
                             cam_data['connection_attempts'] = 1
                             save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
+                            create_celery_log_entry('Problema de conexión', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} pasó a estado \'reconnecting\' en el intento 1.')
                     elif connection_state == 'reconnecting':
                         if not test_camera_connection(ip_url):
                             connection_attempts += 1
                             cam_data['connection_attempts'] = connection_attempts
                             if connection_attempts >= 5:
                                 cam_data['connection_state'] = 'failed'
+                                create_celery_log_entry('Conexión fallida', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} pasó a estado \'failed\' después de 5 intentos.')
                             save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
                         else:
-                            # Reconexión exitosa
                             cam_data['connection_state'] = 'stable'
                             cam_data['connection_attempts'] = 0
                             save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
+                            create_celery_log_entry('Conexión recuperada', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} recuperó conexión después de {connection_attempts} intentos.')
                     elif connection_state == 'failed':
-                        # Intento indefinido, si se recupera sola:
+                        connection_attempts += 1
+                        cam_data['connection_attempts'] = connection_attempts
                         if test_camera_connection(ip_url):
                             cam_data['connection_state'] = 'stable'
                             cam_data['connection_attempts'] = 0
-                            save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
+                            create_celery_log_entry('Conexión recuperada', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} recuperó conexión después de {connection_attempts} intentos.')
+                        save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
