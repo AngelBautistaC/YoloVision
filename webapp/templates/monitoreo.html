@@ -5,10 +5,31 @@
 
 {% block content %}
 <div class="container-fluid mt-4">
-  
+
     <div id="alert-container"></div>
 
-    <h3>Cámaras Configuradas</h3>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Cámaras Configuradas</h3>
+        <div class="d-flex align-items-center">
+            <span id="last-updated-text" class="me-3">Datos actualizados al: Cargando...</span>
+            <button id="refresh-button" class="btn btn-outline-secondary btn-sm me-2" title="Actualizar ahora">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+            <div class="dropdown">
+                <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="autoRefreshDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    Auto-Refresco: Off
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="autoRefreshDropdown">
+                    <li><a class="dropdown-item auto-refresh-option" data-interval="0">Off</a></li>
+                    <li><a class="dropdown-item auto-refresh-option" data-interval="10">10 segundos</a></li>
+                    <li><a class="dropdown-item auto-refresh-option" data-interval="30">30 segundos</a></li>
+                    <li><a class="dropdown-item auto-refresh-option" data-interval="60">1 minuto</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+
     <table class="table table-striped" id="camaras-configuradas-table">
         <thead>
             <tr>
@@ -20,8 +41,7 @@
                 <th>Supervisar</th>
             </tr>
         </thead>
-        <tbody>
-            {% for cam in camaras_configuradas %}
+        <tbody id="camaras-configuradas-body"> {% for cam in camaras_configuradas %}
             <tr data-uuid="{{ cam.uuid }}">
                 <td><input type="checkbox" class="camera-checkbox" value="{{ cam.uuid }}"></td>
                 <td>{{ cam.ambiente }}</td>
@@ -35,7 +55,7 @@
                         <small>(Intentos: {{ cam.connection_attempts }}/5)</small>
                     {% elif cam.connection_state == 'failed' %}
                         <i class="bi bi-x-circle-fill text-danger"></i>
-                        <small>Sin conexión. El sistema seguirá intentando.</small>
+                        <small>Sin conexión desde hace {{ cam.connection_attempts }} minutos. El sistema seguirá intentando.</small>
                     {% endif %}
                 </td>
                 <td>
@@ -49,14 +69,13 @@
             {% endfor %}
         </tbody>
     </table>
-    
+
     <hr class="my-4">
 
     <div class="row">
         <div class="col-12">
             <h3>Resumen de Aforo por Ambiente</h3>
-            <div class="d-flex justify-content-between">
-                {% for ambiente, datos in resumen_ambientes.items %}
+            <div class="d-flex justify-content-between" id="resumen-ambientes-container"> {% for ambiente, datos in resumen_ambientes.items %}
                 <div class="text-center p-3" style="flex: 1; background-color: #f8f9fa; border-radius: 8px; margin: 10px;">
                     <div style="font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">{{ ambiente }}</div>
                     <div>
@@ -92,8 +111,7 @@
                         <th>Asientos Totales</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for mesa in datos_monitoreo %}
+                <tbody id="detalle-tabla-body"> {% for mesa in datos_monitoreo %}
                     <tr class="detalle-row" data-ambiente="{{ mesa.ambiente }}">
                         <td>{{ mesa.ambiente }}</td>
                         <td>{{ mesa.piso }}</td>
@@ -107,8 +125,8 @@
             </table>
         </div>
     </div>
-  
-  <div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
+
+    <div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -169,7 +187,7 @@
 
     function openDeleteConfirmationModal() {
         const cameraNames = [];
-        const cameraData = []; 
+        const cameraData = [];
 
         selectedCameras.forEach(uuid => {
             const row = document.querySelector(`tr[data-uuid="${uuid}"]`);
@@ -187,7 +205,7 @@
             }
         });
 
-        
+
         const modalBody = document.getElementById('camera-names-list');
         modalBody.innerHTML = '';
         cameraNames.forEach(name => {
@@ -196,13 +214,13 @@
             modalBody.appendChild(li);
         });
 
-        
+
         const modal = new bootstrap.Modal(document.getElementById('deleteConfirmationModal'));
         modal.show();
 
-        
+
         document.getElementById('confirm-delete-btn').onclick = () => {
-            deleteSelectedCameras(cameraData); 
+            deleteSelectedCameras(cameraData);
             modal.hide();
         };
     }
@@ -237,7 +255,7 @@
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: JSON.stringify({ cameras: cameraData }) 
+            body: JSON.stringify({ cameras: cameraData })
         })
         .then(response => response.json())
         .then(response => {
@@ -275,7 +293,188 @@
         }
         return cookieValue;
     }
-});
+
+
+    // Refresh functionality JavaScript:
+    let autoRefreshIntervalId = null;
+    const lastUpdatedText = document.getElementById('last-updated-text');
+    const refreshButton = document.getElementById('refresh-button');
+    const autoRefreshDropdown = document.getElementById('autoRefreshDropdown');
+    const autoRefreshOptions = document.querySelectorAll('.auto-refresh-option');
+    const camarasConfiguradasBody = document.getElementById('camaras-configuradas-body'); // Get tbody for cameras table
+    const resumenAmbientesContainer = document.getElementById('resumen-ambientes-container'); // Get container for resumen ambientes
+    const detalleTablaBody = document.getElementById('detalle-tabla-body'); // Get tbody for detalle table
+
+    function updateDashboardData() {
+    //console.log("updateDashboardData() - Function started"); // START LOG
+
+    fetch('/monitoreo/data/')
+        .then(response => {
+            //console.log("updateDashboardData() - Fetch response received:", response); // RESPONSE RECEIVED LOG
+            if (!response.ok) {
+                console.error("updateDashboardData() - HTTP error!", response.status);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            //console.log("updateDashboardData() - Data received from JSON:", data); // DATA RECEIVED LOG
+
+            // 1. Update Camaras Configuradas Table Content
+            let camarasConfiguradasHTML = '';
+            data.camaras_configuradas.forEach(cam => {
+                camarasConfiguradasHTML += `
+                    <tr data-uuid="${cam.uuid}">
+                        <td><input type="checkbox" class="camera-checkbox" value="${cam.uuid}"></td>
+                        <td>${cam.ambiente}</td>
+                        <td>${cam.piso}</td>
+                        <td>${cam.camara}</td>
+                        <td>
+                            ${getConnectionStateIcon(cam.connection_state, cam.connection_attempts)}
+                        </td>
+                        <td>
+                            ${cam.connection_state === 'stable' ? `<a href="/monitoreo/supervisar-camara/${cam.uuid}/" class="btn btn-primary btn-sm">Supervisar</a>` : '<small>No disponible</small>'}
+                        </td>
+                    </tr>`;
+            });
+            const camarasConfiguradasBody = document.getElementById('camaras-configuradas-body');
+            if (camarasConfiguradasBody) {
+                camarasConfiguradasBody.innerHTML = camarasConfiguradasHTML;
+                //console.log("updateDashboardData() - camarasConfiguradasBody updated"); // TABLE 1 UPDATED LOG
+            }
+
+            // 2. Update Resumen de Aforo por Ambiente Content
+            let resumenAmbientesHTML = '';
+            for (const ambiente in data.resumen_ambientes) {
+                const datos = data.resumen_ambientes[ambiente];
+                resumenAmbientesHTML += `
+                    <div class="text-center p-3" style="flex: 1; background-color: #f8f9fa; border-radius: 8px; margin: 10px;">
+                        <div style="font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">${ambiente}</div>
+                        <div>
+                            <h1 style="margin: 0;">${datos.asientos_disponibles}</h1>
+                            <p>Asientos Disponibles</p>
+                        </div>
+                        <hr style="border-top: 1px solid #ddd; width: 80%; margin: 10px auto;">
+                        <div>
+                            <small>Capacidad Máxima: ${datos.max_personas}</small>
+                        </div>
+                    </div>`;
+            }
+            const resumenAmbientesContainer = document.getElementById('resumen-ambientes-container');
+            if (resumenAmbientesContainer) {
+                resumenAmbientesContainer.innerHTML = resumenAmbientesHTML;
+                //console.log("updateDashboardData() - resumenAmbientesContainer updated"); // RESUMEN UPDATED LOG
+            }
+
+            // 3. Update Detalle Tabla Content
+            let detalleTablaHTML = '';
+            data.datos_monitoreo.forEach(mesa => {
+                detalleTablaHTML += `
+                    <tr class="detalle-row" data-ambiente="${mesa.ambiente}">
+                        <td>${mesa.ambiente}</td>
+                        <td>${mesa.piso}</td>
+                        <td>${mesa.mesa_id}</td>
+                        <td>${mesa.camara}</td>
+                        <td>${mesa.asientos_disponibles}</td>
+                        <td>${mesa.max_personas}</td>
+                    </tr>`;
+            });
+            const detalleTablaBody = document.getElementById('detalle-tabla-body');
+            if (detalleTablaBody) {
+                detalleTablaBody.innerHTML = detalleTablaHTML;
+                //console.log("updateDashboardData() - detalleTablaBody updated"); // TABLE 2 UPDATED LOG
+            }
+
+            // 4. Update "Last Updated" timestamp
+            const lastUpdatedText = document.getElementById('last-updated-text'); // Get it here again to ensure it's in scope if needed
+            if (lastUpdatedText) { // Check if element exists to prevent errors
+                lastUpdatedText.textContent = `Datos actualizados al: ${new Date().toLocaleTimeString()}`;
+                //console.log("updateDashboardData() - lastUpdatedText updated"); // TIMESTAMP UPDATED LOG
+            } else {
+                //console.warn("updateDashboardData() - lastUpdatedText element not found!"); // Warn if element is missing
+            }
+
+
+            // 5. Re-initialize event listeners for camera checkboxes AFTER updating tables
+            reinitializeCameraCheckboxes();
+            //console.log("updateDashboardData() - reinitializeCameraCheckboxes() called"); // CHECKBOX RE-INIT LOG
+
+        })
+        .catch(error => {
+            //console.error('Error al actualizar datos del dashboard:', error); // EXISTING ERROR LOG
+            alert('Error al actualizar datos del dashboard.');
+        });
+}
+
+
+
+    function getConnectionStateIcon(state, attempts) {
+        if (state === 'stable') {
+            return '<i class="bi bi-check-circle-fill text-success"></i>';
+        } else if (state === 'reconnecting') {
+            return `<i class="bi bi-exclamation-triangle-fill text-warning"></i> <small>(Intentos: ${attempts}/5)</small>`;
+        } else if (state === 'failed') {
+            return `<i class="bi bi-x-circle-fill text-danger"></i> <small>Sin conexión desde hace ${attempts} minutos. El sistema seguirá intentando.</small>`;
+        }
+        return 'Desconocido';
+    }
+
+
+    function refreshDashboard() {
+        updateDashboardData();
+    }
+
+    function setupAutoRefresh(interval) {
+        if (autoRefreshIntervalId) {
+            clearInterval(autoRefreshIntervalId); // Clear any existing interval
+            autoRefreshIntervalId = null;
+        }
+        if (interval > 0) {
+            autoRefreshIntervalId = setInterval(refreshDashboard, interval * 1000);
+            autoRefreshDropdown.textContent = `Auto-Refresco: ${interval} segundos`;
+        } else {
+            autoRefreshDropdown.textContent = 'Auto-Refresco: Off';
+        }
+    }
+
+
+    refreshButton.addEventListener('click', refreshDashboard);
+
+    autoRefreshOptions.forEach(option => {
+        option.addEventListener('click', function(event) {
+            const interval = parseInt(this.dataset.interval);
+            setupAutoRefresh(interval);
+            autoRefreshDropdown.textContent = `Auto-Refresco: ${this.textContent}`; // Update dropdown text
+        });
+    });
+
+
+    updateDashboardData(); // Initial data load on page load
+    setupAutoRefresh(0); // Initialize auto-refresh to off
+
+
+    // Re-initialize event listeners for camera checkboxes after content update
+    function reinitializeCameraCheckboxes() {
+        const cameraCheckboxes = document.querySelectorAll('.camera-checkbox');
+        cameraCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    selectedCameras.add(this.value);
+                } else {
+                    selectedCameras.delete(this.value);
+                    selectAllCheckbox.checked = false;
+                }
+                updateAlert();
+            });
+        });
+    }
+
+
+
+    reinitializeCameraCheckboxes(); // Initial call to set up listeners on initial load
+
+
+}); // End of DOMContentLoaded
 
 </script>
 {% endblock %}

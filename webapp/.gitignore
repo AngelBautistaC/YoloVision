@@ -5,3 +5,5 @@ __pycache__/
 celerybeat-schedule
 dump.rdb
 celerybeat-schedule.db
+webapp/__pycache__/
+YoloVision/webapp/webapp/__pycache__

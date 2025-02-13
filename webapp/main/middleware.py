@@ -45,7 +45,8 @@ class RoleMiddleware:
             # Obtener el UID del usuario autenticado
             try:
                 decoded_token = auth.verify_id_token(request.COOKIES.get('firebase_token')) # Suponiendo que guardas el token de Firebase en una cookie
-                uid = decoded_token['uid']
+                uid = decoded_token.get('uid') # Use .get() to avoid KeyError if 'uid' is missing
+ 
 
                 # Autenticar al usuario con el UID
                 user = auth.get_user(uid)

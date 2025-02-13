@@ -14,50 +14,43 @@ from ultralytics import YOLO
 import base64
 import math
 from .firebase_helpers import delete_camera_from_firebase,get_camera_by_ip, save_camera_data,get_camera_by_uuid,save_camera_data2,get_ambientes_and_pisos_from_db
-from .tasks import start_detection_task
-from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
-
+# from .tasks import start_detection_task
+# from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from .forms import CreateUserForm
 from .firebase_helpers import create_user_in_firebase  # Function to handle Firebase user creation
-
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from .forms import LoginForm
 from .firebase_helpers import authenticate_firebase_user, save_user_to_firebase
-
 logger = logging.getLogger(__name__)
-
 from firebase_admin import credentials, db
-
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect,render
-
 import json
 import os
 from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.models import User
-
-
-
 from functools import wraps
 from django.shortcuts import redirect
 from django.conf import settings
-
-
 from logger.utils import create_log_entry
-
 from logger.views import log_view
-
 from logger.models import LogEntry
-
 from django.urls import reverse # Para el middleware
-
-
 from django.contrib.auth import logout
 from django.views.decorators.cache import never_cache
+from collections import defaultdict
+# views.py
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from firebase_admin import db
+
+
+
+
 
 def role_required(allowed_roles=[]):
     """
@@ -81,9 +74,6 @@ def role_required(allowed_roles=[]):
 
 def access_denied(request):
     return render(request, 'access_denied.html')
-
-
-from firebase_admin import db
 
 def configurar_deteccion(request):
     ref = db.reference('ambientes')
@@ -559,13 +549,16 @@ def login_view(request):
             user, role = authenticate_firebase_user(email, password)
 
             if user:
+       
+                firebase_token = user.firebase_token # Assuming authenticate_firebase_user now returns user with firebase_token
+
                 # Store user's email in session
                 request.session['user_email'] = user.email
                 request.session.save()  # Guardar la sesión explícitamente
 
                 # Create Django User instance if it doesn't exist
                 django_user, created = User.objects.get_or_create(username=user.email)
-                django_user.is_staff = role == 'administrator'
+                django_user.is_staff = role == 'admin'
                 django_user.save()
                 login(request, django_user)
                 request.session['user_role'] = role
@@ -575,8 +568,13 @@ def login_view(request):
 
                 create_log_entry(request, 'Inicio de sesión', f'Usuario: {user.email}')
                 next_url = request.session.pop('next_url', None)
-                return redirect(next_url or 'monitoreo')
+                #return redirect(next_url or 'monitoreo')
+                response = redirect(next_url or 'monitoreo')
+                response.set_cookie('firebase_token', firebase_token.decode('utf-8')) # Ensure token is string and set cookie
+                return response
+
             else:
+                logout(request)
                 messages.error(request, 'Invalid credentials. Please try again.')
     else:
         form = LoginForm()
@@ -604,7 +602,7 @@ def crear_view(request):
     user_role = request.session.get('user_role')
 
     # Solo permite el acceso si el rol es 'operator' o 'administrator'
-    if user_role not in ['operator', 'administrator']:
+    if user_role not in ['operator', 'admin']:
         return redirect('access_denied')  # Redirige a una vista de acceso denegado
 
     if request.method == 'POST':
@@ -627,16 +625,13 @@ def crear_view(request):
 
     return render(request, 'crear.html', {'form': form})
     
-# views.py
-from django.shortcuts import render, redirect
-from django.contrib import messages
 
 def crear_form_view(request):
     # Verifica si el rol del usuario está almacenado en la sesión
     user_role = request.session.get('user_role')
 
     # Solo permite el acceso si el rol es 'operator' o 'administrator'
-    if user_role not in ['operator', 'administrator']:
+    if user_role not in ['operator', 'admin']:
         return redirect('access_denied')  # Redirige a una vista de acceso denegado
 
     if request.method == 'POST':
@@ -1055,9 +1050,6 @@ def obtener_info_mesas_uuid(request, camera_uuid):
     polygons = camera_data.get('mesas', [])
     return JsonResponse({'mesas': polygons})
 
-from collections import defaultdict
-
-
 
 def obtener_datos_monitoreo():
     ambientes_ref = db.reference('/ambientes')
@@ -1116,17 +1108,40 @@ def obtener_datos_monitoreo():
 
 
 
+# @never_cache
+# @login_required
+# def monitoring_view(request):
+#     print(f"monitoring_view: Rol en la sesión: {request.session.get('user_role')}") # <-- Depuración
+#     datos_monitoreo, resumen_ambientes, camaras_configuradas = obtener_datos_monitoreo()
+#     return render(request, 'monitoreo.html', {
+#         'datos_monitoreo': datos_monitoreo,
+#         'resumen_ambientes': resumen_ambientes,
+#         'camaras_configuradas': camaras_configuradas
+#     })
+
+
+
 @never_cache
 @login_required
 def monitoring_view(request):
     print(f"monitoring_view: Rol en la sesión: {request.session.get('user_role')}") # <-- Depuración
-    datos_monitoreo, resumen_ambientes, camaras_configuradas = obtener_datos_monitoreo()
+    datos_monitoreo, resumen_ambientes, camaras_configuradas = obtener_datos_monitoreo() # Get initial data here
     return render(request, 'monitoreo.html', {
-        'datos_monitoreo': datos_monitoreo,
+        'datos_monitoreo': datos_monitoreo, # Pass data to template
         'resumen_ambientes': resumen_ambientes,
         'camaras_configuradas': camaras_configuradas
     })
 
+@login_required # Added login_required decorator
+@never_cache
+def get_monitoreo_data(request):
+    datos_monitoreo, resumen_ambientes, camaras_configuradas = obtener_datos_monitoreo()
+    data = {
+        'datos_monitoreo': datos_monitoreo,
+        'resumen_ambientes': resumen_ambientes,
+        'camaras_configuradas': camaras_configuradas
+    }
+    return JsonResponse(data)
 
 
 @login_required
@@ -1161,7 +1176,7 @@ def eliminar_camaras(request):
 ##Seccion Logs:
 
 @login_required
-@role_required(allowed_roles=['administrator'])  # Asegúrate de que solo los administradores puedan acceder
+@role_required(allowed_roles=['admin'])  # Asegúrate de que solo los administradores puedan acceder
 def admin_logs(request):
     logs = LogEntry.objects.all().order_by('-timestamp')
     return render(request, 'admin_logs.html', {'logs': logs})

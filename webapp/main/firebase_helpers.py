@@ -145,9 +145,19 @@ def authenticate_firebase_user(email, password):
             print(f"Firebase Authentication Error: {response_data['error']['message']}")
             return None, None
 
-        # Get the user from Firebase Authentication to retrieve the UID
+        # **Extract idToken from response_data**
+        id_token = response_data.get('idToken')
+        if not id_token:
+            print("Error: ID token not found in Firebase authentication response.")
+            return None, None
+
+        # Get the user from Firebase Authentication Admin SDK to retrieve the UserRecord (UID, etc.)
         user = auth.get_user_by_email(email)
-        print(f"authenticate_firebase_user: User UID: {user.uid}") # <-- Depuración
+        print(f"authenticate_firebase_user: User UID: {user.uid}")
+
+        # Attach the id_token to the user object
+        user.firebase_token = id_token.encode('utf-8') # Encode to bytes for cookie (optional, but safer)
+
 
         # Retrieve the user's role from Firestore using the UID
         firestore_client = firestore.client()
@@ -155,7 +165,7 @@ def authenticate_firebase_user(email, password):
 
         if user_data.exists:
             role = user_data.to_dict().get('role', 'user')  # Default to 'user' if no role
-            print(f"authenticate_firebase_user: Usuario {email}, Rol encontrado en Firestore: {role}") # <-- Depuración
+            print(f"authenticate_firebase_user: Usuario {email}, Rol encontrado en Firestore: {role}")
             return user, role
         else:
             print(f"authenticate_firebase_user: User data not found in Firestore for UID: {user.uid}")

@@ -147,18 +147,18 @@
             <div class="sidebar-heading">
                 <img src="{% static 'images/cabeceraPUCP.png' %}" alt="PUCP Logo">
                 <button id="close-sidebar">&times;</button>
-                <p>Rol actual: {{ request.session.user_role }}</p> {# <-- Línea para mostrar el rol #}
+                <!-- <p>Rol actual: {{ request.session.user_role }}</p> {# <-- Línea para mostrar el rol #} -->
             </div>
             <ul class="sidebar-nav">
                 <li class="{% if request.path == '/monitoreo/' %}active{% endif %}">
                     <a href="/monitoreo"><i class="active"></i> Monitoreo</a>
                 </li>
-                {% if request.session.user_role == 'administrator' or request.session.user_role == 'operator' %}
+                {% if request.session.user_role == 'admin' or request.session.user_role == 'operator' %}
                 <li class="{% if request.path == '/configuracion/' %}active{% endif %}">
                     <a href="/configuracion"><i class="active"></i> Configuración</a>
                 </li>
                 {% endif %}
-                {% if request.session.user_role == 'administrator' %}
+                {% if request.session.user_role == 'admin' %}
                 <li class="{% if request.path == '/crear/' %}active{% endif %}">
                     <a href="/crear"><i class="active"></i> Crear Usuarios</a>
                 </li>
