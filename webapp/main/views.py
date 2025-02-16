@@ -1055,7 +1055,7 @@ def obtener_datos_monitoreo():
     ambientes_ref = db.reference('/ambientes')
     ambientes_data = ambientes_ref.get()
     datos_monitoreo = []
-    resumen_ambientes = defaultdict(lambda: {'personas_detectadas': 0, 'max_personas': 0, 'asientos_disponibles': 0})
+    resumen_ambientes = defaultdict(lambda: {'personas_detectadas': 0, 'max_personas': 0, 'asientos_disponibles': 0, 'ultima_deteccion': 0})
     camaras_configuradas = []
 
     if isinstance(ambientes_data, dict):
@@ -1066,79 +1066,92 @@ def obtener_datos_monitoreo():
                     camaras = piso_data.get('camara', {})
                     if isinstance(camaras, dict):
                         for cam_uuid, cam_data in camaras.items():
-                            # Solo cámaras con estado "configurated"
                             if cam_data.get('status') == 'configurated':
+                                # ---  NO FILTRAMOS por tiempo aquí ---
+                                last_detection_time = cam_data.get('last_detection_time', 0)
+                                current_time = time.time()
+                                time_diff = current_time - last_detection_time  # Calcula SIEMPRE la diferencia
+
                                 connection_state = cam_data.get('connection_state', 'stable')
                                 connection_attempts = cam_data.get('connection_attempts', 0)
                                 cam_label = cam_data.get('label', 'Sin etiqueta')
                                 mesas = cam_data.get('mesas', [])
 
-                                # Añadimos la cámara a la lista de cámaras configuradas
                                 camaras_configuradas.append({
                                     "ambiente": ambiente_nombre,
                                     "piso": piso_nombre,
                                     "camara": cam_label,
                                     "uuid": cam_uuid,
                                     "connection_state": connection_state,
-                                    "connection_attempts": connection_attempts
+                                    "connection_attempts": connection_attempts,
+                                    "antiguedad": int(time_diff),  # Siempre incluye la antigüedad
                                 })
 
-                                if isinstance(mesas, list):
-                                    for mesa in mesas:
-                                        personas_detectadas = mesa.get("personas_Detectadas", 0)
-                                        max_personas = mesa.get("max_personas", 0)
-                                        asientos_disponibles = max_personas - personas_detectadas
 
-                                        mesa_info = {
-                                            "ambiente": ambiente_nombre,
-                                            "piso": piso_nombre,
-                                            "camara": cam_label,
-                                            "mesa_id": mesa.get("id", "N/A"),
-                                            "max_personas": max_personas,
-                                            "personas_detectadas": personas_detectadas,
-                                            "asientos_disponibles": asientos_disponibles,
-                                        }
-                                        datos_monitoreo.append(mesa_info)
+                                # --- Filtro de tiempo SOLO para datos_monitoreo y resumen_ambientes ---
+                                if time_diff <= 150:
+                                    if isinstance(mesas, list):
+                                        for mesa in mesas:
+                                            personas_detectadas = mesa.get("personas_Detectadas", 0)
+                                            max_personas = mesa.get("max_personas", 0)
+                                            asientos_disponibles = max_personas - personas_detectadas
 
-                                        resumen_ambientes[ambiente_nombre]['personas_detectadas'] += personas_detectadas
-                                        resumen_ambientes[ambiente_nombre]['max_personas'] += max_personas
-                                        resumen_ambientes[ambiente_nombre]['asientos_disponibles'] += asientos_disponibles
+                                            mesa_info = {
+                                                "ambiente": ambiente_nombre,
+                                                "piso": piso_nombre,
+                                                "camara": cam_label,
+                                                "mesa_id": mesa.get("id", "N/A"),
+                                                "max_personas": max_personas,
+                                                "personas_detectadas": personas_detectadas,
+                                                "asientos_disponibles": asientos_disponibles,
+                                            }
+                                            datos_monitoreo.append(mesa_info)
+
+                                            resumen_ambientes[ambiente_nombre]['personas_detectadas'] += personas_detectadas
+                                            resumen_ambientes[ambiente_nombre]['max_personas'] += max_personas
+                                            resumen_ambientes[ambiente_nombre]['asientos_disponibles'] += asientos_disponibles
+                                            resumen_ambientes[ambiente_nombre]['ultima_deteccion'] = max(
+                                                resumen_ambientes[ambiente_nombre]['ultima_deteccion'],
+                                                last_detection_time
+                                            )
+
+    # Calcula la antigüedad para el resumen de ambientes
+    for ambiente, datos in resumen_ambientes.items():
+        if datos['ultima_deteccion'] > 0:
+             datos['antiguedad'] = int(time.time() - datos['ultima_deteccion'])
+        else:
+            datos['antiguedad'] = None
 
     return datos_monitoreo, dict(resumen_ambientes), camaras_configuradas
-
-
-
-# @never_cache
-# @login_required
-# def monitoring_view(request):
-#     print(f"monitoring_view: Rol en la sesión: {request.session.get('user_role')}") # <-- Depuración
-#     datos_monitoreo, resumen_ambientes, camaras_configuradas = obtener_datos_monitoreo()
-#     return render(request, 'monitoreo.html', {
-#         'datos_monitoreo': datos_monitoreo,
-#         'resumen_ambientes': resumen_ambientes,
-#         'camaras_configuradas': camaras_configuradas
-#     })
 
 
 
 @never_cache
 @login_required
 def monitoring_view(request):
-    print(f"monitoring_view: Rol en la sesión: {request.session.get('user_role')}") # <-- Depuración
-    datos_monitoreo, resumen_ambientes, camaras_configuradas = obtener_datos_monitoreo() # Get initial data here
+    datos_monitoreo, resumen_ambientes, camaras_configuradas = obtener_datos_monitoreo()
     return render(request, 'monitoreo.html', {
-        'datos_monitoreo': datos_monitoreo, # Pass data to template
+        'datos_monitoreo': datos_monitoreo,
         'resumen_ambientes': resumen_ambientes,
         'camaras_configuradas': camaras_configuradas
     })
 
-@login_required # Added login_required decorator
+
+@login_required
 @never_cache
 def get_monitoreo_data(request):
     datos_monitoreo, resumen_ambientes, camaras_configuradas = obtener_datos_monitoreo()
+
+    # Filtra resumen_ambientes para incluir solo aquellos con detecciones recientes
+    resumen_ambientes_filtrado = {}
+    for ambiente, datos in resumen_ambientes.items():
+        if datos['antiguedad'] is not None and datos['antiguedad'] <= 150:
+            resumen_ambientes_filtrado[ambiente] = datos
+
+
     data = {
         'datos_monitoreo': datos_monitoreo,
-        'resumen_ambientes': resumen_ambientes,
+        'resumen_ambientes': resumen_ambientes_filtrado,  # Usa el resumen filtrado
         'camaras_configuradas': camaras_configuradas
     }
     return JsonResponse(data)
