@@ -4,105 +4,112 @@
 {% block page_title %}Monitoreo{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="container-fluid">
+    <div id="alert-container" class="mt-3"></div>
 
-    <div id="alert-container"></div>
-
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>Cámaras Configuradas</h3>
-        <div class="d-flex align-items-center">
-            <span id="last-updated-text" class="me-3">Datos actualizados al: Cargando...</span>
-            <button id="refresh-button" class="btn btn-outline-secondary btn-sm me-2" title="Actualizar ahora">
-                <i class="bi bi-arrow-clockwise"></i>
-            </button>
-            <div class="dropdown">
-                <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="autoRefreshDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                    Auto-Refresco: Off
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3">
+        <h3 style="color: #343a40;">Cámaras Configuradas</h3>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <div class="d-flex align-items-center">
+                <span id="last-updated-text" class="me-3">Datos actualizados al: Cargando...</span>
+                <button id="refresh-button" class="btn btn-outline-secondary btn-sm me-2" title="Actualizar ahora">
+                    <i class="bi bi-arrow-clockwise"></i>
                 </button>
-                <ul class="dropdown-menu" aria-labelledby="autoRefreshDropdown">
-                    <li><a class="dropdown-item auto-refresh-option" data-interval="0">Off</a></li>
-                    <li><a class="dropdown-item auto-refresh-option" data-interval="10">10 segundos</a></li>
-                    <li><a class="dropdown-item auto-refresh-option" data-interval="30">30 segundos</a></li>
-                    <li><a class="dropdown-item auto-refresh-option" data-interval="60">1 minuto</a></li>
-                </ul>
+                <div class="dropdown">
+                    <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="autoRefreshDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        Auto-Refresco: Off
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="autoRefreshDropdown">
+                        <li><a class="dropdown-item auto-refresh-option" data-interval="0">Off</a></li>
+                        <li><a class="dropdown-item auto-refresh-option" data-interval="10">10 segundos</a></li>
+                        <li><a class="dropdown-item auto-refresh-option" data-interval="30">30 segundos</a></li>
+                        <li><a class="dropdown-item auto-refresh-option" data-interval="60">1 minuto</a></li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
 
-
-    <table class="table table-striped" id="camaras-configuradas-table">
-        <thead>
-            <tr>
-                <th><input type="checkbox" id="select-all-cameras"></th>
-                <th>Ambiente</th>
-                <th>Piso</th>
-                <th>Cámara</th>
-                <th>Estado</th>
-                <th>Supervisar</th>
-            </tr>
-        </thead>
-        <tbody id="camaras-configuradas-body">
-          </tbody>
-    </table>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover" id="camaras-configuradas-table" style="border: none;">
+            <thead style="color: #343a40">
+                <tr>
+                    <th style="border: none;"><input type="checkbox" id="select-all-cameras"></th>
+                    <th style="border: none;">Ambiente</th>
+                    <th style="border: none;">Piso</th>
+                    <th style="border: none;">Cámara</th>
+                    <th style="border: none;">Estado</th>
+                    <th style="border: none;">Supervisar</th>
+                </tr>
+            </thead>
+            <tbody id="camaras-configuradas-body">
+            </tbody>
+        </table>
+    </div>
 
     <hr class="my-4">
 
     <div class="row">
         <div class="col-12">
-            <h3>Resumen de Aforo por Ambiente <i class="bi bi-info-circle-fill" data-bs-toggle="tooltip" data-bs-placement="top" title="Solo se muestran los ambientes con cámaras que han realizado detecciones en los últimos 2.5 minutos."></i></h3>
-             <div id="no-detections-card" style="display: none;" class="alert alert-info" role="alert">
-              No hay cámaras con detecciones recientes en los últimos 2.5 minutos.
+            <h3 style="color: #343a40;">Resumen de Aforo por Ambiente <i class="bi bi-info-circle-fill" data-bs-toggle="tooltip" data-bs-placement="top" title="Solo se muestran los ambientes con cámaras que han realizado detecciones en los últimos 2.5 minutos."></i></h3>
+            <div id="no-detections-card" style="display: none;" class="alert alert-info" role="alert">
+                No hay cámaras con detecciones recientes en los últimos 2.5 minutos.
             </div>
             <div class="d-flex justify-content-between" id="resumen-ambientes-container">
-              </div>
+            </div>
         </div>
     </div>
 
     <div class="row mt-4">
         <div class="col-12 text-center">
-            <button id="toggleTableBtn" class="btn btn-primary">Mostrar detalle</button>
+            <button id="toggleTableBtn" class="btn btn-outline-primary">Mostrar detalle</button>
         </div>
     </div>
 
     <div class="row mt-4" id="detalle-tabla" style="display: none;">
         <div class="col-12">
-            <table class="table table-striped">
-                <thead>
+            <table class="table table-striped" style="border: none;">
+                <thead style="color: #343a40">
                     <tr>
-                        <th>Ambiente</th>
-                        <th>Piso</th>
-                        <th>Mesa</th>
-                        <th>Cámara</th>
-                        <th>Asientos Disponibles</th>
-                        <th>Asientos Totales</th>
-                         <th>Antigüedad</th>  </tr>
+                        <th style="border: none;">Ambiente</th>
+                        <th style="border: none;">Piso</th>
+                        <th style="border: none;">Mesa</th>
+                        <th style="border: none;">Cámara</th>
+                        <th style="border: none;">Asientos Disponibles</th>
+                        <th style="border: none;">Asientos Totales</th>
+                        <th style="border: none;">Antigüedad</th> </tr>
                 </thead>
                 <tbody id="detalle-tabla-body">
-                   </tbody>
+                    </tbody>
             </table>
         </div>
     </div>
 
     <div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="deleteConfirmationModalLabel">Confirmar Eliminación</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>¿Está seguro de que desea eliminar las siguientes cámaras?</p>
-                    <ul id="camera-names-list"></ul>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-danger" id="confirm-delete-btn">Eliminar</button>
-                </div>
-            </div>
+    <div class="modal-dialog">
+        <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title" id="deleteConfirmationModalLabel">Confirmar Eliminación</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
+        <div class="modal-body">
+            <p>¿Está seguro de que desea eliminar las siguientes cámaras?</p>
+            <ul id="camera-names-list"></ul>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-danger" id="confirm-delete-btn">Eliminar</button>
+        </div>
+        </div>
+    </div>
     </div>
 </div>
 {% endblock %}
+
+
+
+
+
 
 {% block extra_js %}
 <script>
@@ -123,7 +130,7 @@
         const alertContainer = document.getElementById('alert-container');
         let selectedCameras = new Set();
 
-    
+
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
         var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
             return new bootstrap.Tooltip(tooltipTriggerEl)
@@ -205,44 +212,44 @@
                     selectedCameras.add(this.value);
                 } else {
                     selectedCameras.delete(this.value);
-                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.checked = false; // Uncheck "Select All" if any individual camera is unchecked.
                 }
                 updateAlert();
             });
         });
 
-      function deleteSelectedCameras(cameraData) {
-        fetch('/monitoreo/eliminar_camaras/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
-          },
-          body: JSON.stringify({
-            cameras: cameraData
-          })
-        })
-          .then(response => response.json())
-          .then(response => {
-            if (response.success) {
-              cameraData.forEach(cam => {
-                const row = document.querySelector(`tr[data-uuid="${cam.uuid}"]`);
-                if (row) {
-                  row.remove();
-                }
-              });
-              selectedCameras.clear();
-              updateAlert();
-              alert('Cámaras eliminadas exitosamente');
-            } else {
-              alert('Error al eliminar cámaras: ' + response.error);
-            }
-          })
-          .catch(error => {
-            console.error("Error AJAX:", error);
-            alert('Error al eliminar cámaras: ' + error);
-          });
-      }
+        function deleteSelectedCameras(cameraData) {
+            fetch('/monitoreo/eliminar_camaras/', { //  Make sure this URL is correct in your urls.py
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken') //  Get CSRF token for Django
+                },
+                body: JSON.stringify({
+                    cameras: cameraData
+                })
+            })
+                .then(response => response.json())
+                .then(response => {
+                    if (response.success) {
+                        cameraData.forEach(cam => {
+                            const row = document.querySelector(`tr[data-uuid="${cam.uuid}"]`);
+                            if (row) {
+                                row.remove(); // Remove the row from the table
+                            }
+                        });
+                        selectedCameras.clear(); // Clear the selection
+                        updateAlert();  //Update the alert
+                        alert('Cámaras eliminadas exitosamente');
+                    } else {
+                        alert('Error al eliminar cámaras: ' + response.error);
+                    }
+                })
+                .catch(error => {
+                    console.error("Error AJAX:", error);
+                    alert('Error al eliminar cámaras: ' + error);
+                });
+        }
 
         function getCookie(name) {
             let cookieValue = null;
@@ -250,6 +257,7 @@
                 const cookies = document.cookie.split(';');
                 for (let i = 0; i < cookies.length; i++) {
                     const cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
                     if (cookie.startsWith(name + '=')) {
                         cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
                         break;
@@ -266,13 +274,13 @@
         const refreshButton = document.getElementById('refresh-button');
         const autoRefreshDropdown = document.getElementById('autoRefreshDropdown');
         const autoRefreshOptions = document.querySelectorAll('.auto-refresh-option');
-        const camarasConfiguradasBody = document.getElementById('camaras-configuradas-body'); // Get tbody for cameras table
-        const resumenAmbientesContainer = document.getElementById('resumen-ambientes-container'); // Get container for resumen ambientes
-        const detalleTablaBody = document.getElementById('detalle-tabla-body'); // Get tbody for detalle table
+        const camarasConfiguradasBody = document.getElementById('camaras-configuradas-body');
+        const resumenAmbientesContainer = document.getElementById('resumen-ambientes-container');
+        const detalleTablaBody = document.getElementById('detalle-tabla-body');
         const noDetectionsCard = document.getElementById('no-detections-card'); //CARD
 
         function updateDashboardData() {
-            fetch('/monitoreo/data/')
+            fetch('/monitoreo/data/')  //  Make sure this URL is correct!
                 .then(response => {
                     if (!response.ok) {
                         console.error("updateDashboardData() - HTTP error!", response.status);
@@ -282,89 +290,78 @@
                 })
                 .then(data => {
 
-                    // 1. Update Camaras Configuradas Table Content
+                    // 1. Update "Cámaras Configuradas" Table
                     let camarasConfiguradasHTML = '';
-                    let hasRecentDetections = false; // Track if there are any recent detections
-
                     data.camaras_configuradas.forEach(cam => {
-                         hasRecentDetections = true; //Si encuentra al menos 1, cambia a true
+                      // Removed rowClass, as we are not using Bootstrap's contextual classes for coloring
                         camarasConfiguradasHTML += `
                             <tr data-uuid="${cam.uuid}">
-                                <td><input type="checkbox" class="camera-checkbox" value="${cam.uuid}"></td>
-                                <td>${cam.ambiente}</td>
-                                <td>${cam.piso}</td>
-                                <td>${cam.camara}</td>
-                                <td>
+                                <td style="border: none;"><input type="checkbox" class="camera-checkbox" value="${cam.uuid}"></td>
+                                <td style="border: none;">${cam.ambiente}</td>
+                                <td style="border: none;">${cam.piso}</td>
+                                <td style="border: none;">${cam.camara}</td>
+                                <td style="border: none;">
                                     ${getConnectionStateIcon(cam.connection_state, cam.connection_attempts)}
                                 </td>
-                                
-                                <td>
-                                    ${cam.connection_state === 'stable' ? `<a href="/monitoreo/supervisar-camara/${cam.uuid}/" class="btn btn-primary btn-sm">Supervisar</a>` : '<small>No disponible</small>'}
+                                <td style="border: none;">
+                                    ${cam.connection_state === 'stable' ? `<a href="/monitoreo/supervisar-camara/${cam.uuid}/">Supervisar</a>` : '<small>No disponible</small>'}
                                 </td>
                             </tr>`;
                     });
-                    if (camarasConfiguradasBody) {
-                        camarasConfiguradasBody.innerHTML = camarasConfiguradasHTML;
-                    }
+                    camarasConfiguradasBody.innerHTML = camarasConfiguradasHTML;
 
-                    // 2. Update Resumen de Aforo por Ambiente Content
 
+                   // 2. Update "Resumen de Aforo por Ambiente"
                     let resumenAmbientesHTML = '';
-                    //Verifica si existen datos:
                     if (Object.keys(data.resumen_ambientes).length === 0) {
-                        noDetectionsCard.style.display = 'block'; // Show the card
+                      noDetectionsCard.style.display = 'block';
                     } else {
-                        noDetectionsCard.style.display = 'none'; // Hide the card
+                      noDetectionsCard.style.display = 'none';
 
-                         for (const ambiente in data.resumen_ambientes) {
+                        for (const ambiente in data.resumen_ambientes) {
                             const datos = data.resumen_ambientes[ambiente];
                             resumenAmbientesHTML += `
-                                <div class="text-center p-3" style="flex: 1; background-color: #f8f9fa; border-radius: 8px; margin: 10px;">
-                                    <div style="font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">${ambiente}</div>
+                                <div class="text-center p-3" style="flex: 1;  border-radius: 8px; margin: 10px; border: none; background-color: #f8f9fa;">
+                                    <div style="font-weight: bold; font-size: 1.2em; margin-bottom: 10px; color: #343a40;">${ambiente}</div>
                                     <div>
-                                        <h1 style="margin: 0;">${datos.asientos_disponibles}</h1>
-                                        <p>Asientos Disponibles</p>
+                                        <h1 style="margin: 0; color: #343a40;">${datos.asientos_disponibles}</h1>
+                                        <p style="color: #343a40;">Asientos Disponibles</p>
                                     </div>
                                     <hr style="border-top: 1px solid #ddd; width: 80%; margin: 10px auto;">
                                     <div>
-                                        <small>Capacidad Máxima: ${datos.max_personas}</small>
+                                        <small style="color: #343a40;">Capacidad Máxima: ${datos.max_personas}</small>
                                     </div>
                                      <div style="margin-top: 5px;">
-                                        <small>Última detección: ${datos.antiguedad === null ? 'Nunca' : 'Hace ' + datos.antiguedad + ' segundos'}</small>
-                                    </div>
+                                            <small style="color: #343a40;">Última detección: ${datos.antiguedad === null ? 'Nunca' : 'Hace ' + formatTimeDiff(datos.antiguedad)}</small>
+                                     </div>
                                 </div>`;
 
-                         }
+                        }
                     }
+                    resumenAmbientesContainer.innerHTML = resumenAmbientesHTML;
 
-                    if (resumenAmbientesContainer) {
-                        resumenAmbientesContainer.innerHTML = resumenAmbientesHTML;
-                    }
-
-                    // 3. Update Detalle Tabla Content
+                  // 3. Update "Detalle Tabla"
                     let detalleTablaHTML = '';
                     data.datos_monitoreo.forEach(mesa => {
                         detalleTablaHTML += `
                             <tr class="detalle-row" data-ambiente="${mesa.ambiente}">
-                                <td>${mesa.ambiente}</td>
-                                <td>${mesa.piso}</td>
-                                <td>${mesa.mesa_id}</td>
-                                <td>${mesa.camara}</td>
-                                <td>${mesa.asientos_disponibles}</td>
-                                <td>${mesa.max_personas}</td>
-                                 <td></td>
+                                <td style="border: none;">${mesa.ambiente}</td>
+                                <td style="border: none;">${mesa.piso}</td>
+                                <td style="border: none;">${mesa.mesa_id}</td>
+                                <td style="border: none;">${mesa.camara}</td>
+                                <td style="border: none;">${mesa.asientos_disponibles}</td>
+                                <td style="border: none;">${mesa.max_personas}</td>
+                                <td style="border: none;">${mesa.antiguedad !== null ? formatTimeDiff(mesa.antiguedad) : 'Nunca'}</td>
                             </tr>`;
                     });
+                    detalleTablaBody.innerHTML = detalleTablaHTML;
 
-                    if (detalleTablaBody) {
-                        detalleTablaBody.innerHTML = detalleTablaHTML;
-                    }
+
 
                     // 4. Update "Last Updated" timestamp
-                    if (lastUpdatedText) {
-                        lastUpdatedText.textContent = `Datos actualizados al: ${new Date().toLocaleTimeString()}`;
-                    }
-                    reinitializeCameraCheckboxes();
+                    lastUpdatedText.textContent = `Datos actualizados al: ${new Date().toLocaleTimeString()}`;
+
+                    reinitializeCameraCheckboxes(); //VERY VERY IMPORTANT
 
                 })
                 .catch(error => {
@@ -374,16 +371,36 @@
         }
 
 
-
         function getConnectionStateIcon(state, attempts) {
             if (state === 'stable') {
-                return '<i class="bi bi-check-circle-fill text-success"></i>';
+                return '<i class="bi bi-check-circle-fill" style="color: green;"></i> Correcto';
             } else if (state === 'reconnecting') {
-                return `<i class="bi bi-exclamation-triangle-fill text-warning"></i> <small>(Intentos: ${attempts}/5)</small>`;
+                return '<i class="bi bi-exclamation-triangle-fill" style="color: orange;"></i>  (Sin conexión hace: ' + attempts + '/5 minutos.)';
             } else if (state === 'failed') {
-                return `<i class="bi bi-x-circle-fill text-danger"></i> <small>Sin conexión desde hace ${attempts} minutos. El sistema seguirá intentando.</small>`;
+                return '<i class="bi bi-x-circle-fill" style="color: red;"></i> Sin conexión hace ' + attempts + ' minutos. El sistema seguirá intentando.';
             }
             return 'Desconocido';
+        }
+
+        // Function to format time difference
+        function formatTimeDiff(seconds) {
+            if (seconds === null || seconds === undefined) {
+                return 'Nunca';
+            }
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const remainingSeconds = seconds % 60;
+
+            let formattedTime = '';
+            if(hours>0) {
+              formattedTime += `${hours}h `;
+            }
+            if(minutes > 0 || hours > 0){ //Show minutes even if 0, if we have hours.
+              formattedTime += `${minutes}m `;
+            }
+            formattedTime += `${remainingSeconds}s`;
+
+            return formattedTime;
         }
 
 
@@ -404,21 +421,21 @@
             }
         }
 
-
+        // Event Listeners:
         refreshButton.addEventListener('click', refreshDashboard);
 
         autoRefreshOptions.forEach(option => {
             option.addEventListener('click', function(event) {
                 const interval = parseInt(this.dataset.interval);
                 setupAutoRefresh(interval);
-                autoRefreshDropdown.textContent = `Auto-Refresco: ${this.textContent}`; // Update dropdown text
+                autoRefreshDropdown.textContent = `Auto-Refresco: ${this.textContent}`; // Update dropdown text to show selection.
             });
         });
 
 
-        updateDashboardData();
-        setupAutoRefresh(0);
-
+        // Initial setup:
+        updateDashboardData(); // Load data on page load.
+        setupAutoRefresh(0);   // Initially, auto-refresh is off.
 
         // Re-initialize event listeners for camera checkboxes after content update
         function reinitializeCameraCheckboxes() {
@@ -429,13 +446,13 @@
                         selectedCameras.add(this.value);
                     } else {
                         selectedCameras.delete(this.value);
-                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.checked = false; // Uncheck "Select All"
                     }
                     updateAlert();
                 });
             });
         }
-        reinitializeCameraCheckboxes();
+        reinitializeCameraCheckboxes(); // Call once initially, and then after every data update.
     });
 
 </script>

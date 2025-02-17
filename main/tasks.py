@@ -164,25 +164,25 @@ def check_connection_task():
                             cam_data['connection_state'] = 'reconnecting'
                             cam_data['connection_attempts'] = 1
                             save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
-                            create_celery_log_entry('Problema de conexión', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} pasó a estado \'reconnecting\' en el intento 1.')
+                            create_celery_log_entry('Problema de conexión', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} pasó a estado \'reconectando\' tras un intento fallido de conexión .')
                     elif connection_state == 'reconnecting':
                         if not test_camera_connection(ip_url):
                             connection_attempts += 1
                             cam_data['connection_attempts'] = connection_attempts
                             if connection_attempts >= 5:
                                 cam_data['connection_state'] = 'failed'
-                                create_celery_log_entry('Conexión fallida', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} pasó a estado \'failed\' después de 5 intentos.')
+                                create_celery_log_entry('Conexión fallida', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} pasó a estado \'failed\' después de 5 minutos sin conexión.')
                             save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
                         else:
                             cam_data['connection_state'] = 'stable'
                             cam_data['connection_attempts'] = 0
                             save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
-                            create_celery_log_entry('Conexión recuperada', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} recuperó conexión después de {connection_attempts} intentos.')
+                            create_celery_log_entry('Conexión recuperada', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} recuperó conexión después de {connection_attempts} minutos.')
                     elif connection_state == 'failed':
                         connection_attempts += 1
                         cam_data['connection_attempts'] = connection_attempts
                         if test_camera_connection(ip_url):
                             cam_data['connection_state'] = 'stable'
                             cam_data['connection_attempts'] = 0
-                            create_celery_log_entry('Conexión recuperada', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} recuperó conexión después de {connection_attempts} intentos.')
+                            create_celery_log_entry('Conexión recuperada', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} recuperó conexión después de {connection_attempts} minutos.')
                         save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)

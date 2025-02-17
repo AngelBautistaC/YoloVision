@@ -134,6 +134,8 @@ def obtener_detecciones(request):
     all_polygons = detected_polygons + manual_polygons
     return JsonResponse({'detections': all_polygons})
 
+
+#Deteccion de mesas -- FUNCIONAL
 def detectar_mesas(request):
     if request.method == 'POST':
         camera_data = request.session.get('camera_data')
@@ -153,7 +155,7 @@ def detectar_mesas(request):
         # Resize frame to 640x480
         frame = cv2.resize(frame, (640, 480))
 
-        model = YOLO('yolo11n-seg.pt')
+        model = YOLO('yolo11s-seg.pt')
 
         results = model(frame, classes=[60], conf=0.1)
 
@@ -1050,7 +1052,6 @@ def obtener_info_mesas_uuid(request, camera_uuid):
     polygons = camera_data.get('mesas', [])
     return JsonResponse({'mesas': polygons})
 
-
 def obtener_datos_monitoreo():
     ambientes_ref = db.reference('/ambientes')
     ambientes_data = ambientes_ref.get()
@@ -1067,7 +1068,6 @@ def obtener_datos_monitoreo():
                     if isinstance(camaras, dict):
                         for cam_uuid, cam_data in camaras.items():
                             if cam_data.get('status') == 'configurated':
-                                # ---  NO FILTRAMOS por tiempo aquí ---
                                 last_detection_time = cam_data.get('last_detection_time', 0)
                                 current_time = time.time()
                                 time_diff = current_time - last_detection_time  # Calcula SIEMPRE la diferencia
@@ -1087,7 +1087,6 @@ def obtener_datos_monitoreo():
                                     "antiguedad": int(time_diff),  # Siempre incluye la antigüedad
                                 })
 
-
                                 # --- Filtro de tiempo SOLO para datos_monitoreo y resumen_ambientes ---
                                 if time_diff <= 150:
                                     if isinstance(mesas, list):
@@ -1104,12 +1103,14 @@ def obtener_datos_monitoreo():
                                                 "max_personas": max_personas,
                                                 "personas_detectadas": personas_detectadas,
                                                 "asientos_disponibles": asientos_disponibles,
+                                                "antiguedad": int(time_diff), # Agregado para la tabla de detalle
                                             }
                                             datos_monitoreo.append(mesa_info)
 
                                             resumen_ambientes[ambiente_nombre]['personas_detectadas'] += personas_detectadas
                                             resumen_ambientes[ambiente_nombre]['max_personas'] += max_personas
                                             resumen_ambientes[ambiente_nombre]['asientos_disponibles'] += asientos_disponibles
+                                            # Usamos la mayor ultima deteccion entre las mesas de la camara.
                                             resumen_ambientes[ambiente_nombre]['ultima_deteccion'] = max(
                                                 resumen_ambientes[ambiente_nombre]['ultima_deteccion'],
                                                 last_detection_time
@@ -1118,9 +1119,10 @@ def obtener_datos_monitoreo():
     # Calcula la antigüedad para el resumen de ambientes
     for ambiente, datos in resumen_ambientes.items():
         if datos['ultima_deteccion'] > 0:
-             datos['antiguedad'] = int(time.time() - datos['ultima_deteccion'])
+            # Calcula la diferencia, ahora correctamente
+            datos['antiguedad'] = int(time.time() - datos['ultima_deteccion'])
         else:
-            datos['antiguedad'] = None
+            datos['antiguedad'] = None  # O usa None si no hay detecciones
 
     return datos_monitoreo, dict(resumen_ambientes), camaras_configuradas
 
@@ -1145,9 +1147,9 @@ def get_monitoreo_data(request):
     # Filtra resumen_ambientes para incluir solo aquellos con detecciones recientes
     resumen_ambientes_filtrado = {}
     for ambiente, datos in resumen_ambientes.items():
+        #  Filtra *aquí*, justo antes de enviar los datos
         if datos['antiguedad'] is not None and datos['antiguedad'] <= 150:
             resumen_ambientes_filtrado[ambiente] = datos
-
 
     data = {
         'datos_monitoreo': datos_monitoreo,
@@ -1155,7 +1157,6 @@ def get_monitoreo_data(request):
         'camaras_configuradas': camaras_configuradas
     }
     return JsonResponse(data)
-
 
 @login_required
 def eliminar_camaras(request):
