@@ -153,7 +153,7 @@ def detectar_mesas(request):
         # Resize frame to 640x480
         frame = cv2.resize(frame, (640, 480))
 
-        model = YOLO('yolov8n-seg.pt')
+        model = YOLO('yolo11n-seg.pt')
 
         results = model(frame, classes=[60], conf=0.1)
 
@@ -258,7 +258,7 @@ def stream_video(request):
             return
 
         if tracking_active:
-            model = YOLO('yolov8n.pt')
+            model = YOLO('yolo11n.pt')
         else:
             model = None
 

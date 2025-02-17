@@ -66,4 +66,4 @@ def track_and_count(frame, model, track_history, counting_regions):
     return frame
 
 # Load YOLO model
-model = YOLO('yolov8s-seg.pt')
+model = YOLO('yolo11s-seg.pt')

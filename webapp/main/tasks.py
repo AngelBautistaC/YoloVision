@@ -61,7 +61,7 @@ def run_detection_for_configured_cameras():
                             continue
 
                         frame = cv2.resize(frame, (640, 480))
-                        model = YOLO('yolov8n.pt')
+                        model = YOLO('yolo11s.pt')
 
                         # Preparar tracking_data
                         tracking_data_list = []
@@ -99,7 +99,7 @@ def start_detection_task(camera_uuid):
     ambiente_nombre = camera_data['ambiente']
     piso = camera_data['piso']
 
-    model = YOLO('yolov8n.pt')
+    model = YOLO('yolo11n.pt')
     tracking_data_list = []
     for polygon in polygons:
         expanded_polygon = expand_polygon(polygon['points'], 0, pixels_per_meter)
