@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+import os  # Importa el módulo 'os' si no está ya
 
 # settings.py
 LOGIN_URL = '/login/'
@@ -62,7 +63,7 @@ MIDDLEWARE = [
     'main.middleware.RoleMiddleware', 
 ]
 
-ROOT_URLCONF = 'webapp.urls'
+ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
     {
@@ -80,7 +81,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'webapp.wsgi.application'
+WSGI_APPLICATION = 'config.wsgi.application'
 
 ##Implementacion de logging -- eliminar despues --
 LOGGING = {
