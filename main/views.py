@@ -660,11 +660,9 @@ def crear_form_view(request):
     return render(request, 'crear.html')
 
 
+#------------------------------------------------------------------------------------------------
 
-
-logger = logging.getLogger(__name__)
-
-
+#Funciones para la calibración de la cámara :: calibrar_camara.html.
 
 @login_required
 #@role_required(allowed_roles=['operator', 'administrator'])
@@ -733,8 +731,6 @@ def calibrar_camara_paso1(request):
             return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'})
 
     return render(request, 'calibrar_camara.html', context)
-
-
 
 @login_required
 #@role_required(allowed_roles=['operator', 'administrator'])
@@ -835,6 +831,40 @@ def calibrar_camara_paso3(request):
 
     return render(request, 'calibrar_camara.html', context)
 
+def camera_stream(request):
+    ip_port = request.GET.get('ip_port')
+    if not ip_port:
+        return HttpResponseBadRequest("El parámetro IP:Port es obligatorio")
+
+    return StreamingHttpResponse(gen_frames(ip_port),
+                                 content_type='multipart/x-mixed-replace; boundary=frame')
+
+@login_required
+#@role_required(allowed_roles=['operator', 'administrator'])
+def calibrar_camara_paso_final(request):
+    # Verificar si se ha completado el paso 3
+    if not request.session.get('pixels_per_meter'):
+        return redirect('calibrar_camara_paso1')
+
+    context = {
+        'step': 'final',
+        'camera_name': request.session.get('camera_name', ''),
+        'ambiente': request.session.get('ambiente', ''),
+        'piso': request.session.get('piso', ''),
+        'pixels_per_meter': request.session.get('pixels_per_meter', ''),
+    }
+    
+        # Limpiar datos de calibración
+    calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
+    for key in calibration_keys:
+        if key in request.session:
+            del request.session[key]
+    return render(request, 'calibrar_camara.html', context)
+
+
+#------------------------------------------------------------------------------------------------
+
+
 
 
 def capture_frame(ip_port):
@@ -893,39 +923,7 @@ def gen_frames(camera_url):
 
     cap.release()
 
-def camera_stream(request):
-    ip_port = request.GET.get('ip_port')
-    if not ip_port:
-        return HttpResponseBadRequest("El parámetro IP:Port es obligatorio")
 
-    # Opcional: Validar el formato de la URL
-    # Puedes agregar validaciones para asegurarte de que la URL es válida
-
-    return StreamingHttpResponse(gen_frames(ip_port),
-                                 content_type='multipart/x-mixed-replace; boundary=frame')
-
-
-@login_required
-#@role_required(allowed_roles=['operator', 'administrator'])
-def calibrar_camara_paso_final(request):
-    # Verificar si se ha completado el paso 3
-    if not request.session.get('pixels_per_meter'):
-        return redirect('calibrar_camara_paso1')
-
-    context = {
-        'step': 'final',
-        'camera_name': request.session.get('camera_name', ''),
-        'ambiente': request.session.get('ambiente', ''),
-        'piso': request.session.get('piso', ''),
-        'pixels_per_meter': request.session.get('pixels_per_meter', ''),
-    }
-    
-        # Limpiar datos de calibración
-    calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter']
-    for key in calibration_keys:
-        if key in request.session:
-            del request.session[key]
-    return render(request, 'calibrar_camara.html', context)
 
 def load_json_data():
     if os.path.exists(JSON_FILE_PATH):
