@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 from django.contrib.auth import views as auth_views # Importar las vistas de autenticación de Django
-from main.views import get_monitoreo_data,logout_view,admin_logs,access_denied, eliminar_camaras,crear_form_view,crear_view,login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas,supervisar_camara,stream_supervisar_camara,obtener_info_mesas_uuid
+from main.views import store_line_points,get_monitoreo_data,logout_view,admin_logs,access_denied, eliminar_camaras,crear_form_view,crear_view,login_view, monitoring_view,configuracion_view,camera_stream,calibrar_camara_paso_final,calibrar_camara_paso1,calibrar_camara_paso3,configurar_deteccion,iniciar_deteccion,stream_video,actualizar_poligono,etiquetar_poligono,agregar_poligono,quitar_poligono,obtener_detecciones,obtener_info_mesas,iniciar_tracking,detectar_mesas,supervisar_camara,stream_supervisar_camara,obtener_info_mesas_uuid
 urlpatterns = [
     path('logout/', logout_view, name='logout'),
     path('admin/', admin.site.urls),
@@ -18,6 +18,7 @@ urlpatterns = [
     path('camera_stream/', camera_stream, name='camera_stream'),
     path('configuracion/calibrar/paso1/', calibrar_camara_paso1, name='calibrar_camara_paso1'),
     path('configuracion/calibrar/paso3/', calibrar_camara_paso3, name='calibrar_camara_paso3'),
+    path('configuracion/calibrar/store_line_points/', store_line_points, name='store_line_points'),
     path('configuracion/calibrar/final/', calibrar_camara_paso_final, name='calibrar_camara_paso_final'),
     path('configuracion/configurar-deteccion/', configurar_deteccion, name='configurar_deteccion'),
     path('configuracion/iniciar-deteccion/', iniciar_deteccion, name='iniciar_deteccion'),
