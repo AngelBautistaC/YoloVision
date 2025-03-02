@@ -111,131 +111,11 @@ def configurar_deteccion(request):
 
 
 
-def iniciar_deteccion(request):
-    if request.method == 'POST':
-        ip_url = request.POST.get('ip_url')
-        camera_uuid, cam_data = get_camera_by_ip(ip_url)
-
-        if not camera_uuid or not cam_data:
-            return JsonResponse({'error': 'Cámara no encontrada'})
-
-        # Guardar datos de la cámara en la sesión
-        request.session['camera_data'] = cam_data
-        # Set tracking_active to False
-        request.session['tracking_active'] = False
-
-        return JsonResponse({'success': True})
-    
-    return JsonResponse({'error': 'Método no permitido'})
 
 
-def obtener_detecciones(request):
-    detected_polygons = request.session.get('detections', [])
-    manual_polygons = request.session.get('manual_polygons', [])
-    all_polygons = detected_polygons + manual_polygons
-    return JsonResponse({'detections': all_polygons})
 
 
-#Deteccion de mesas -- FUNCIONAL
-def detectar_mesas(request):
-    if request.method == 'POST':
-        camera_data = request.session.get('camera_data')
-        if not camera_data:
-            return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
 
-        ip_url = camera_data['ip_url']
-        pixels_per_meter = camera_data['px_m']
-
-        cap = cv2.VideoCapture(ip_url)
-        success, frame = cap.read()
-        cap.release()
-
-        if not success:
-            return JsonResponse({'error': 'No se pudo capturar el frame'})
-
-        # Resize frame to 640x480
-        frame = cv2.resize(frame, (640, 480))
-
-        model = YOLO('yolo11s-seg.pt')
-
-        results = model(frame, classes=[60], conf=0.1)
-
-        detected_polygons = []
-
-        for result in results:
-            masks = result.masks
-            if masks is not None:
-                for i, mask in enumerate(masks):
-                    mask_array = mask.xy[0].astype(int)
-                    polygon = cv2.convexHull(mask_array)
-                    simplified_polygon = simplify_polygon(polygon)
-                    if simplified_polygon is not None:
-                        simplified_polygon = np.array(simplified_polygon, dtype=np.float32)
-                        if len(simplified_polygon) > 2:
-                            # Calculate additional information
-                            area_pixels = cv2.contourArea(simplified_polygon)
-                            area_meters = area_pixels / (pixels_per_meter ** 2)
-                            perimeter_pixels = cv2.arcLength(simplified_polygon, True)
-                            perimeter_meters = perimeter_pixels / pixels_per_meter
-                            personas = math.floor(perimeter_meters / 1.15)
-
-                            detected_polygons.append({
-                                'id': str(uuid.uuid4()),
-                                'points': simplified_polygon.tolist(),
-                                'label': f"Tabla {i+1}",
-                                'color': generate_random_color(),
-                                'type': 'detected',
-                                'area': area_meters,
-                                'perimeter': perimeter_meters,
-                                'max_personas': personas
-                            })
-        
-        request.session['detections'] = detected_polygons
-
-        return JsonResponse({'success': True, 'detections': detected_polygons})
-
-    return JsonResponse({'error': 'Método no permitido'})
-
-
-def iniciar_tracking(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        polygons = data.get('polygons', [])
-        detection_interval = data.get('detection_interval', 5)
-
-        camera_data = request.session.get('camera_data')
-        if not camera_data:
-            return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
-
-        ip_url = camera_data['ip_url']
-
-        camera_uuid, existing_camera_data = get_camera_by_ip(ip_url)
-        if not camera_uuid or not existing_camera_data:
-            return JsonResponse({'error': 'Cámara no encontrada en Firebase'})
-
-        existing_camera_data['mesas'] = polygons
-        existing_camera_data['detection_interval'] = detection_interval
-        existing_camera_data['status'] = 'configurated'
-        if 'connection_state' not in existing_camera_data:
-            existing_camera_data['connection_state'] = 'stable'
-        if 'connection_attempts' not in existing_camera_data:
-            existing_camera_data['connection_attempts'] = 0
-        if 'last_detection_time' not in existing_camera_data:
-            existing_camera_data['last_detection_time'] = 0
-
-        ambiente_nombre = existing_camera_data['ambiente']
-        piso = existing_camera_data['piso']
-
-        save_camera_data2(ambiente_nombre, piso, camera_uuid, existing_camera_data)
-
-        create_log_entry(request, 'Configurar Cámara', f'Finalizó la configuración de la cámara con IP: {ip_url}')
-
-        # Ya no llamamos start_detection_task.delay(camera_uuid)
-        # Las tareas periódicas de celery beat se encargarán.
-        
-        return JsonResponse({'success': True, 'camera_uuid': camera_uuid})
-
-    return JsonResponse({'error': 'Método no permitido'})
 
 
 
@@ -307,137 +187,8 @@ def generate_random_color():
     return tuple(np.random.randint(0, 255, 3).tolist())
 
 
-def etiquetar_poligono(request):
-    if request.method == 'POST':
-        polygon_id = request.POST.get('polygon_id')
-        new_label = request.POST.get('label')
-        detections = request.session.get('detections', [])
-        manual_polygons = request.session.get('manual_polygons', [])
-        
-        updated = False
-        
-        for detection in detections + manual_polygons:
-            if detection['id'] == polygon_id:
-                detection['label'] = new_label
-                updated = True
-                break
 
-        # Update in database.json if necessary
-        camera_data = request.session.get('camera_data')
-        if camera_data:
-            ip_url = camera_data['ip_url']
-            db_data = load_json_data()
-            camera = None
-            for ambiente in db_data['ambientes']:
-                for piso, piso_data in ambiente['piso'].items():
-                    for cam in piso_data.get('camara', []):
-                        if cam['ip_url'] == ip_url:
-                            camera = cam
-                            break
-            if camera:
-                mesas = camera.get('mesas', [])
-                for mesa in mesas:
-                    if mesa['id'] == polygon_id:
-                        mesa['label'] = new_label
-                        save_json_data(db_data)
-                        break
-        
-        if updated:
-            request.session['detections'] = detections
-            request.session['manual_polygons'] = manual_polygons
-            return JsonResponse({'success': True})
-        
-        return JsonResponse({'error': 'Polígono no encontrado'})
-    
-    return JsonResponse({'error': 'Método no permitido'})
 
-def agregar_poligono(request):
-    if request.method == 'POST':
-        points = json.loads(request.POST.get('points'))
-        camera_data = request.session.get('camera_data')
-        pixels_per_meter = camera_data['px_m']
-        
-        new_polygon = {
-            'id': str(uuid.uuid4()),
-            'points': points,
-            'label': f"Polígono {len(request.session.get('manual_polygons', [])) + 1}",
-            'color': generate_random_color(),
-            'type': 'manual'
-        }
-        
-        # Calcular información adicional
-        area_pixels = cv2.contourArea(np.array(points, dtype=np.int32))
-        area_meters = area_pixels / (pixels_per_meter ** 2)
-        perimeter_pixels = cv2.arcLength(np.array(points, dtype=np.int32), True)
-        perimeter_meters = perimeter_pixels / pixels_per_meter
-        personas = math.floor(perimeter_meters / 1.15)  # 1.15 es personas_por_perimetro
-        
-        new_polygon['area'] = area_meters
-        new_polygon['perimeter'] = perimeter_meters
-        new_polygon['max_personas'] = personas
-        
-        manual_polygons = request.session.get('manual_polygons', [])
-        manual_polygons = [p for p in manual_polygons if p['id'] != new_polygon['id']]
-        manual_polygons.append(new_polygon)
-        request.session['manual_polygons'] = manual_polygons
-
-        return JsonResponse({'success': True, 'polygon': new_polygon})
-    
-    return JsonResponse({'error': 'Método no permitido'})
-
-def quitar_poligono(request):
-    if request.method == 'POST':
-        polygon_id = request.POST.get('polygon_id')
-        detections = request.session.get('detections', [])
-        manual_polygons = request.session.get('manual_polygons', [])
-        
-        detections = [d for d in detections if d['id'] != polygon_id]
-        manual_polygons = [p for p in manual_polygons if p['id'] != polygon_id]
-        
-        request.session['detections'] = detections
-        request.session['manual_polygons'] = manual_polygons
-        
-        return JsonResponse({'success': True})
-    
-    return JsonResponse({'error': 'Método no permitido'})
-
-def actualizar_poligono(request):
-    if request.method == 'POST':
-        polygon_id = request.POST.get('id')
-        new_points = json.loads(request.POST.get('points'))
-        camera_data = request.session.get('camera_data')
-        pixels_per_meter = camera_data['px_m']
-        
-        detected_polygons = request.session.get('detections', [])
-        manual_polygons = request.session.get('manual_polygons', [])
-        
-        for polygon_list in [detected_polygons, manual_polygons]:
-            for polygon in polygon_list:
-                if polygon['id'] == polygon_id:
-                    polygon['points'] = new_points
-                    
-                    # Recalculate area, perimeter, and max persons
-                    area_pixels = cv2.contourArea(np.array(new_points, dtype=np.int32))
-                    area_meters = area_pixels / (pixels_per_meter ** 2)
-                    perimeter_pixels = cv2.arcLength(np.array(new_points, dtype=np.int32), True)
-                    perimeter_meters = perimeter_pixels / pixels_per_meter
-                    personas = math.floor(perimeter_meters / 1.15)
-                    
-                    polygon['area'] = area_meters
-                    polygon['perimeter'] = perimeter_meters
-                    polygon['max_personas'] = personas
-                    
-                    request.session['detections'] = detected_polygons
-                    request.session['manual_polygons'] = manual_polygons
-                    
-                    return JsonResponse({
-                        'success': True,
-                        'polygon': polygon
-                    })
-        
-        return JsonResponse({'error': 'Polígono no encontrado'})
-    
-    return JsonResponse({'error': 'Método no permitido'})
 
 
 
@@ -471,22 +222,6 @@ def simplify_polygon(polygon, target_points=6):
 
 
 
-
-def obtener_info_mesas(request):
-    camera_data = request.session.get('camera_data')
-    if not camera_data:
-        return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
-
-    # Obtener polígonos detectados en la sesión
-    detected_polygons = request.session.get('detections', [])
-    # Obtener polígonos manuales en la sesión
-    manual_polygons = request.session.get('manual_polygons', [])
-
-    # En el escenario local que funcionaba, no se dependía de backend_polygons cargados desde archivo.
-    # Simplemente se dejaba vacío o se usaba lo que estuviera en la sesión.
-    backend_polygons = []
-
-    return JsonResponse({'mesas': detected_polygons + manual_polygons, 'backend_polygons': backend_polygons})
 
 
 
@@ -655,7 +390,289 @@ def crear_form_view(request):
     return render(request, 'crear.html')
 
 
-#------------------------------------------------------------------------------------------------
+
+
+
+#-----------------------------------------FLUJO CONFIGURACION DE CAMARAS-------------------------------------------------------
+def obtener_info_mesas(request):
+    camera_data = request.session.get('camera_data')
+    if not camera_data:
+        return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
+
+    # Obtener polígonos detectados en la sesión
+    detected_polygons = request.session.get('detections', [])
+    # Obtener polígonos manuales en la sesión
+    manual_polygons = request.session.get('manual_polygons', [])
+
+    # En el escenario local que funcionaba, no se dependía de backend_polygons cargados desde archivo.
+    # Simplemente se dejaba vacío o se usaba lo que estuviera en la sesión.
+    backend_polygons = []
+
+    return JsonResponse({'mesas': detected_polygons + manual_polygons, 'backend_polygons': backend_polygons})
+
+def iniciar_deteccion(request):
+    if request.method == 'POST':
+        ip_url = request.POST.get('ip_url')
+        camera_uuid, cam_data = get_camera_by_ip(ip_url)
+
+        if not camera_uuid or not cam_data:
+            return JsonResponse({'error': 'Cámara no encontrada'})
+
+        # Guardar datos de la cámara en la sesión
+        request.session['camera_data'] = cam_data
+        # Set tracking_active to False
+        request.session['tracking_active'] = False
+
+        return JsonResponse({'success': True})
+    
+    return JsonResponse({'error': 'Método no permitido'})
+
+#Deteccion de mesas -- FUNCIONAL
+def detectar_mesas(request):
+    if request.method == 'POST':
+        camera_data = request.session.get('camera_data')
+        if not camera_data:
+            return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
+
+        ip_url = camera_data['ip_url']
+        pixels_per_meter = camera_data['px_m']
+
+        cap = cv2.VideoCapture(ip_url)
+        success, frame = cap.read()
+        cap.release()
+
+        if not success:
+            return JsonResponse({'error': 'No se pudo capturar el frame'})
+
+        # Resize frame to 640x480
+        frame = cv2.resize(frame, (640, 480))
+
+        model = YOLO('yolo11s-seg.pt')
+
+        results = model(frame, classes=[60], conf=0.1)
+
+        detected_polygons = []
+
+        for result in results:
+            masks = result.masks
+            if masks is not None:
+                for i, mask in enumerate(masks):
+                    mask_array = mask.xy[0].astype(int)
+                    polygon = cv2.convexHull(mask_array)
+                    simplified_polygon = simplify_polygon(polygon)
+                    if simplified_polygon is not None:
+                        simplified_polygon = np.array(simplified_polygon, dtype=np.float32)
+                        if len(simplified_polygon) > 2:
+                            # Calculate additional information
+                            area_pixels = cv2.contourArea(simplified_polygon)
+                            area_meters = area_pixels / (pixels_per_meter ** 2)
+                            perimeter_pixels = cv2.arcLength(simplified_polygon, True)
+                            perimeter_meters = perimeter_pixels / pixels_per_meter
+                            personas = math.floor(perimeter_meters / 1.15)
+
+                            detected_polygons.append({
+                                'id': str(uuid.uuid4()),
+                                'points': simplified_polygon.tolist(),
+                                'label': f"Tabla {i+1}",
+                                'color': generate_random_color(),
+                                'type': 'detected',
+                                'area': area_meters,
+                                'perimeter': perimeter_meters,
+                                'max_personas': personas
+                            })
+        
+        request.session['detections'] = detected_polygons
+
+        return JsonResponse({'success': True, 'detections': detected_polygons})
+
+    return JsonResponse({'error': 'Método no permitido'})
+
+
+
+def obtener_detecciones(request):
+    detected_polygons = request.session.get('detections', [])
+    manual_polygons = request.session.get('manual_polygons', [])
+    all_polygons = detected_polygons + manual_polygons
+    return JsonResponse({'detections': all_polygons})
+
+def agregar_poligono(request):
+    if request.method == 'POST':
+        points = json.loads(request.POST.get('points'))
+        camera_data = request.session.get('camera_data')
+        pixels_per_meter = camera_data['px_m']
+        
+        new_polygon = {
+            'id': str(uuid.uuid4()),
+            'points': points,
+            'label': f"Polígono {len(request.session.get('manual_polygons', [])) + 1}",
+            'color': generate_random_color(),
+            'type': 'manual'
+        }
+        
+        # Calcular información adicional
+        area_pixels = cv2.contourArea(np.array(points, dtype=np.int32))
+        area_meters = area_pixels / (pixels_per_meter ** 2)
+        perimeter_pixels = cv2.arcLength(np.array(points, dtype=np.int32), True)
+        perimeter_meters = perimeter_pixels / pixels_per_meter
+        personas = math.floor(perimeter_meters / 1.15)  # 1.15 es personas_por_perimetro
+        
+        new_polygon['area'] = area_meters
+        new_polygon['perimeter'] = perimeter_meters
+        new_polygon['max_personas'] = personas
+        
+        manual_polygons = request.session.get('manual_polygons', [])
+        manual_polygons = [p for p in manual_polygons if p['id'] != new_polygon['id']]
+        manual_polygons.append(new_polygon)
+        request.session['manual_polygons'] = manual_polygons
+
+        return JsonResponse({'success': True, 'polygon': new_polygon})
+    
+    return JsonResponse({'error': 'Método no permitido'})
+
+def actualizar_poligono(request):
+    if request.method == 'POST':
+        polygon_id = request.POST.get('id')
+        new_points = json.loads(request.POST.get('points'))
+        camera_data = request.session.get('camera_data')
+        pixels_per_meter = camera_data['px_m']
+        
+        detected_polygons = request.session.get('detections', [])
+        manual_polygons = request.session.get('manual_polygons', [])
+        
+        for polygon_list in [detected_polygons, manual_polygons]:
+            for polygon in polygon_list:
+                if polygon['id'] == polygon_id:
+                    polygon['points'] = new_points
+                    
+                    # Recalculate area, perimeter, and max persons
+                    area_pixels = cv2.contourArea(np.array(new_points, dtype=np.int32))
+                    area_meters = area_pixels / (pixels_per_meter ** 2)
+                    perimeter_pixels = cv2.arcLength(np.array(new_points, dtype=np.int32), True)
+                    perimeter_meters = perimeter_pixels / pixels_per_meter
+                    personas = math.floor(perimeter_meters / 1.15)
+                    
+                    polygon['area'] = area_meters
+                    polygon['perimeter'] = perimeter_meters
+                    polygon['max_personas'] = personas
+                    
+                    request.session['detections'] = detected_polygons
+                    request.session['manual_polygons'] = manual_polygons
+                    
+                    return JsonResponse({
+                        'success': True,
+                        'polygon': polygon
+                    })
+        
+        return JsonResponse({'error': 'Polígono no encontrado'})
+    
+    return JsonResponse({'error': 'Método no permitido'})
+
+def etiquetar_poligono(request):
+    if request.method == 'POST':
+        polygon_id = request.POST.get('polygon_id')
+        new_label = request.POST.get('label')
+        detections = request.session.get('detections', [])
+        manual_polygons = request.session.get('manual_polygons', [])
+        
+        updated = False
+        
+        for detection in detections + manual_polygons:
+            if detection['id'] == polygon_id:
+                detection['label'] = new_label
+                updated = True
+                break
+
+        # Update in database.json if necessary
+        camera_data = request.session.get('camera_data')
+        if camera_data:
+            ip_url = camera_data['ip_url']
+            db_data = load_json_data()
+            camera = None
+            for ambiente in db_data['ambientes']:
+                for piso, piso_data in ambiente['piso'].items():
+                    for cam in piso_data.get('camara', []):
+                        if cam['ip_url'] == ip_url:
+                            camera = cam
+                            break
+            if camera:
+                mesas = camera.get('mesas', [])
+                for mesa in mesas:
+                    if mesa['id'] == polygon_id:
+                        mesa['label'] = new_label
+                        save_json_data(db_data)
+                        break
+        
+        if updated:
+            request.session['detections'] = detections
+            request.session['manual_polygons'] = manual_polygons
+            return JsonResponse({'success': True})
+        
+        return JsonResponse({'error': 'Polígono no encontrado'})
+    
+    return JsonResponse({'error': 'Método no permitido'})
+
+def quitar_poligono(request):
+    if request.method == 'POST':
+        polygon_id = request.POST.get('polygon_id')
+        detections = request.session.get('detections', [])
+        manual_polygons = request.session.get('manual_polygons', [])
+        
+        detections = [d for d in detections if d['id'] != polygon_id]
+        manual_polygons = [p for p in manual_polygons if p['id'] != polygon_id]
+        
+        request.session['detections'] = detections
+        request.session['manual_polygons'] = manual_polygons
+        
+        return JsonResponse({'success': True})
+    
+    return JsonResponse({'error': 'Método no permitido'})
+
+def iniciar_tracking(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        polygons = data.get('polygons', [])
+        detection_interval = data.get('detection_interval', 5)
+
+        camera_data = request.session.get('camera_data')
+        if not camera_data:
+            return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
+
+        ip_url = camera_data['ip_url']
+
+        camera_uuid, existing_camera_data = get_camera_by_ip(ip_url)
+        if not camera_uuid or not existing_camera_data:
+            return JsonResponse({'error': 'Cámara no encontrada en Firebase'})
+
+        existing_camera_data['mesas'] = polygons
+        existing_camera_data['detection_interval'] = detection_interval
+        existing_camera_data['status'] = 'configurated'
+        if 'connection_state' not in existing_camera_data:
+            existing_camera_data['connection_state'] = 'stable'
+        if 'connection_attempts' not in existing_camera_data:
+            existing_camera_data['connection_attempts'] = 0
+        if 'last_detection_time' not in existing_camera_data:
+            existing_camera_data['last_detection_time'] = 0
+
+        ambiente_nombre = existing_camera_data['ambiente']
+        piso = existing_camera_data['piso']
+
+        save_camera_data2(ambiente_nombre, piso, camera_uuid, existing_camera_data)
+
+        create_log_entry(request, 'Configurar Cámara', f'Finalizó la configuración de la cámara con IP: {ip_url}')
+
+        # Ya no llamamos start_detection_task.delay(camera_uuid)
+        # Las tareas periódicas de celery beat se encargarán.
+        
+        return JsonResponse({'success': True, 'camera_uuid': camera_uuid})
+
+    return JsonResponse({'error': 'Método no permitido'})
+
+
+#-----------------------------------------FLUJO CONFIGURACION DE CAMARAS - EOF-------------------------------------------------------
+
+
+#-----------------------------------------FLUJO CALIBRACION DE CAMARAS-------------------------------------------------------
+
 @login_required
 def calibrar_camara_paso1(request):
     # Limpiar datos de calibración previos
