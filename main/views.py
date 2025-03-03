@@ -76,37 +76,6 @@ def role_required(allowed_roles=[]):
 def access_denied(request):
     return render(request, 'access_denied.html')
 
-def configurar_deteccion(request):
-    ref = db.reference('ambientes')
-    snapshot = ref.get()
-
-    camaras_calibradas = []
-    if snapshot:
-        for ambiente_nombre, ambiente_data in snapshot.items():
-            pisos_dict = ambiente_data.get('piso', {})
-            if not isinstance(pisos_dict, dict):
-                continue
-
-            for piso_nombre, piso_data in pisos_dict.items():
-                if not isinstance(piso_data, dict):
-                    continue
-
-                camaras_data = piso_data.get('camara', {})
-                if not isinstance(camaras_data, dict):
-                    continue
-
-                for cam_uuid, cam_data in camaras_data.items():
-                    # Mostrar solo cámaras con estado "calibrated"
-                    if cam_data.get('status') == 'calibrated':
-                        camaras_calibradas.append({
-                            'ambiente': ambiente_nombre,
-                            'piso': piso_nombre,
-                            'label': cam_data.get('label', 'Sin etiqueta'),
-                            'ip_url': cam_data['ip_url']
-                        })
-
-    context = {'camaras': camaras_calibradas}
-    return render(request, 'configurar_deteccion.html', context)
 
 
 
@@ -116,71 +85,6 @@ def configurar_deteccion(request):
 
 
 
-
-
-
-
-def stream_video(request):
-    camera_data = request.session.get('camera_data')
-    if not camera_data:
-        return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
-
-    ip_url = camera_data['ip_url']
-    pixels_per_meter = camera_data['px_m']
-    tracking_active = request.session.get('tracking_active', False)
-
-    # Obtener todos los polígonos desde la cámara y/o la sesión, tal como se hacía en local
-    polygons = camera_data.get('mesas', [])
-    detections = request.session.get('detections', [])
-    manual_polygons = request.session.get('manual_polygons', [])
-    polygons = polygons + detections + manual_polygons
-
-    def generate_frames():
-        cap = cv2.VideoCapture(ip_url)
-        if not cap.isOpened():
-            return
-
-        if tracking_active:
-            model = YOLO('yolo11n.pt')
-        else:
-            model = None
-
-        while True:
-            success, frame = cap.read()
-            if not success:
-                break
-            frame = cv2.resize(frame, (640, 480))
-
-            # Si no hay tracking, personas_detectadas = 0
-            if not tracking_active or model is None:
-                for polygon in polygons:
-                    polygon['personas_Detectadas'] = 0
-
-            # Dibujar polígonos directamente desde los datos en sesión
-            for polygon in polygons:
-                points = np.array(polygon['points'], dtype=np.int32)
-                color = polygon.get('color', (0, 255, 0))
-                cv2.polylines(frame, [points], isClosed=True, color=color, thickness=2)
-                text_position = tuple(map(int, points[0]))
-                cv2.putText(frame, polygon['label'], text_position,
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-
-                area = polygon.get('area', 0)
-                max_p = polygon.get('max_personas', 0)
-                detectadas = polygon.get('personas_Detectadas', 0)
-                info_text = f"Area: {area:.2f}m² | Max: {max_p} | Detectadas: {detectadas}"
-                cv2.putText(frame, info_text, (text_position[0], text_position[1] + 20),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
-
-            ret, buffer = cv2.imencode('.jpg', frame)
-            if not ret:
-                continue
-            frame_bytes = buffer.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        cap.release()
-
-    return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
 
 
 def generate_random_color():
@@ -394,6 +298,137 @@ def crear_form_view(request):
 
 
 #-----------------------------------------FLUJO CONFIGURACION DE CAMARAS-------------------------------------------------------
+
+def configurar_deteccion(request):
+    ref = db.reference('ambientes')
+    snapshot = ref.get()
+
+    camaras_calibradas = []
+    if snapshot:
+        for ambiente_nombre, ambiente_data in snapshot.items():
+            pisos_dict = ambiente_data.get('piso', {})
+            if not isinstance(pisos_dict, dict):
+                continue
+
+            for piso_nombre, piso_data in pisos_dict.items():
+                if not isinstance(piso_data, dict):
+                    continue
+
+                camaras_data = piso_data.get('camara', {})
+                if not isinstance(camaras_data, dict):
+                    continue
+
+                for cam_uuid, cam_data in camaras_data.items():
+                    # Mostrar solo cámaras con estado "calibrated"
+                    if cam_data.get('status') == 'calibrated':
+                        # Construir la URL completa si es necesario
+                        if cam_data.get('username') and cam_data.get('password'):
+                            full_url = f"{cam_data.get('protocol', 'http').lower()}://{cam_data.get('username')}:{cam_data.get('password')}@{cam_data.get('ip_url')}"
+                        else:
+                            full_url = cam_data.get('full_url') or cam_data.get('ip_url')  # Usar full_url si existe, sino ip_url
+                            if not (full_url.lower().startswith("http://") or full_url.lower().startswith("https://") or full_url.lower().startswith("rtsp://")):
+                                full_url = f"{cam_data.get('protocol','http').lower()}://{full_url}"
+
+
+                        camaras_calibradas.append({
+                            'ambiente': ambiente_nombre,
+                            'piso': piso_nombre,
+                            'label': cam_data.get('label', 'Sin etiqueta'),
+                            'ip_url': cam_data.get('ip_url'),  # Siempre se muestra, es parte del identificador
+                            'full_url': full_url,  # Usar la URL completa construida
+                            'uuid': cam_uuid
+                        })
+
+    context = {'camaras': camaras_calibradas}
+    return render(request, 'configurar_deteccion.html', context)
+
+
+
+
+
+def stream_video(request):
+    camera_data = request.session.get('camera_data')
+    if not camera_data:
+        return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
+
+    # Usar 'full_url' si está presente, si no, construirla.
+    full_url = camera_data.get('full_url')
+    if not full_url:  # Construir solo si no existe en camera_data
+        if camera_data.get('username') and camera_data.get('password'):
+             ip_url = re.sub(r"^(https?|rtsp)://", "", camera_data['ip_url'], flags=re.IGNORECASE)
+             full_url = f"{camera_data.get('protocol', 'http').lower()}://{camera_data.get('username')}:{camera_data.get('password')}@{ip_url}"
+        else:
+            full_url = camera_data.get('ip_url')
+            if not (full_url.lower().startswith("http://") or full_url.lower().startswith("https://") or full_url.lower().startswith("rtsp://")):
+                 full_url = f"{camera_data.get('protocol', 'http').lower()}://{full_url}"
+    print(full_url)
+    pixels_per_meter = camera_data['px_m']
+    tracking_active = request.session.get('tracking_active', False)
+
+    # Obtener todos los polígonos desde la cámara y/o la sesión
+    polygons = camera_data.get('mesas', [])
+    detections = request.session.get('detections', [])
+    manual_polygons = request.session.get('manual_polygons', [])
+    polygons = polygons + detections + manual_polygons
+
+    def generate_frames():
+        cap = cv2.VideoCapture(full_url)  # Usar la URL completa
+        if not cap.isOpened():
+            return
+
+        if tracking_active:
+            model = YOLO('yolo11n.pt')
+        else:
+            model = None
+
+        while True:
+            success, frame = cap.read()
+            if not success:
+                break
+            frame = cv2.resize(frame, (640, 480))
+
+            # Si no hay tracking, personas_detectadas = 0
+            if not tracking_active or model is None:
+                for polygon in polygons:
+                    polygon['personas_Detectadas'] = 0
+
+            # Dibujar polígonos directamente desde los datos en sesión
+            for polygon in polygons:
+                points = np.array(polygon['points'], dtype=np.int32)
+                color = polygon.get('color', (0, 255, 0))
+                cv2.polylines(frame, [points], isClosed=True, color=color, thickness=2)
+                text_position = tuple(map(int, points[0]))
+                cv2.putText(frame, polygon['label'], text_position,
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+                area = polygon.get('area', 0)
+                max_p = polygon.get('max_personas', 0)
+                detectadas = polygon.get('personas_Detectadas', 0)
+                info_text = f"Area: {area:.2f}m² | Max: {max_p} | Detectadas: {detectadas}"
+                cv2.putText(frame, info_text, (text_position[0], text_position[1] + 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+
+            ret, buffer = cv2.imencode('.jpg', frame)
+            if not ret:
+                continue
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        cap.release()
+
+    return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
+
+
+
+
+
+
+
+
+def generate_random_color():
+    return tuple(np.random.randint(0, 255, 3).tolist())
+
+
 def obtener_info_mesas(request):
     camera_data = request.session.get('camera_data')
     if not camera_data:
@@ -412,32 +447,51 @@ def obtener_info_mesas(request):
 
 def iniciar_deteccion(request):
     if request.method == 'POST':
-        ip_url = request.POST.get('ip_url')
+        ip_url = request.POST.get('ip_url')  # Recibe la 'ip_url' original
+        full_url_from_request = request.POST.get('full_url') #recibe la full url
+
         camera_uuid, cam_data = get_camera_by_ip(ip_url)
 
+
         if not camera_uuid or not cam_data:
+          #Intenta buscar por full url en caso de que no encuentre por ip
+          camera_uuid, cam_data = get_camera_by_ip(full_url_from_request, search_by_full_url=True)
+          if not camera_uuid or not cam_data:
             return JsonResponse({'error': 'Cámara no encontrada'})
 
-        # Guardar datos de la cámara en la sesión
+        # Guardar datos de la cámara en la sesión, incluyendo full_url y ip_url
         request.session['camera_data'] = cam_data
+        request.session['camera_data']['ip_url'] = ip_url  # Asegura que ip_url esté
+
         # Set tracking_active to False
         request.session['tracking_active'] = False
 
         return JsonResponse({'success': True})
-    
+
     return JsonResponse({'error': 'Método no permitido'})
 
-#Deteccion de mesas -- FUNCIONAL
 def detectar_mesas(request):
     if request.method == 'POST':
         camera_data = request.session.get('camera_data')
         if not camera_data:
             return JsonResponse({'error': 'No hay datos de cámara en la sesión'})
 
-        ip_url = camera_data['ip_url']
+        # Usa full_url, construyéndola si es necesario.
+        full_url = camera_data.get('full_url')
+        if not full_url:
+            if camera_data.get('username') and camera_data.get('password'):
+                ip_url = re.sub(r"^(https?|rtsp)://", "", camera_data['ip_url'], flags=re.IGNORECASE)
+                full_url = f"{camera_data.get('protocol', 'http').lower()}://{camera_data.get('username')}:{camera_data.get('password')}@{ip_url}"
+            else:
+                 full_url = camera_data.get('ip_url')
+                 if not (full_url.lower().startswith("http://") or full_url.lower().startswith("https://") or full_url.lower().startswith("rtsp://")):
+                    full_url = f"{camera_data.get('protocol', 'http').lower()}://{full_url}"
+
+
+
         pixels_per_meter = camera_data['px_m']
 
-        cap = cv2.VideoCapture(ip_url)
+        cap = cv2.VideoCapture(full_url)  # Usa full_url
         success, frame = cap.read()
         cap.release()
 
@@ -480,13 +534,12 @@ def detectar_mesas(request):
                                 'perimeter': perimeter_meters,
                                 'max_personas': personas
                             })
-        
+
         request.session['detections'] = detected_polygons
 
         return JsonResponse({'success': True, 'detections': detected_polygons})
 
     return JsonResponse({'error': 'Método no permitido'})
-
 
 
 def obtener_detecciones(request):

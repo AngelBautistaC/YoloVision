@@ -17,32 +17,43 @@ if not firebase_admin._apps:
     })
 
 
-def get_camera_by_ip(ip_url):
-    # Referencia a la raíz de los ambientes
+def get_camera_by_ip(ip_url, search_by_full_url=False):
+    """
+    Busca una cámara por IP/URL o por full_url en la base de datos.
+
+    Args:
+        ip_url (str):  La IP o URL a buscar (o full_url si search_by_full_url es True).
+        search_by_full_url(bool): Si es True, busca por full_url en lugar de ip_url.
+
+    Returns:
+        tuple: (uuid, camera_data)  o (None, None) si no se encuentra.
+    """
     ref = db.reference('ambientes')
     snapshot = ref.get()
 
-    # Recorrer todos los ambientes
-    for ambiente_nombre, ambiente_data in snapshot.items():
-        # Recorrer los pisos dentro de cada ambiente
-        for piso, piso_data in ambiente_data.get('piso', {}).items():
-            # Verificar si piso_data es un diccionario
-            if not isinstance(piso_data, dict):
-                continue  # Saltar este piso
-
-            # Recorrer las cámaras dentro de cada piso
-            camaras = piso_data.get('camara', {})
-            if not isinstance(camaras, dict):
+    if snapshot:
+        for ambiente_nombre, ambiente_data in snapshot.items():
+            pisos_dict = ambiente_data.get('piso', {})
+            if not isinstance(pisos_dict, dict):
                 continue
 
-            for cam_uuid, cam_data in camaras.items():
-                # Verificar si la URL IP coincide
-                if cam_data.get('ip_url') == ip_url:
-                    # Añadir ambiente y piso al cam_data
-                    cam_data['ambiente'] = ambiente_nombre
-                    cam_data['piso'] = piso
-                    return cam_uuid, cam_data
-    # Si no se encontró la cámara, retornar None, None
+            for piso_nombre, piso_data in pisos_dict.items():
+                if not isinstance(piso_data, dict):
+                    continue
+
+                camaras_data = piso_data.get('camara', {})
+                if not isinstance(camaras_data, dict):
+                    continue
+
+                for cam_uuid, cam_data in camaras_data.items():
+                    # Determina la llave a usar para la búsqueda.
+                    search_key = 'full_url' if search_by_full_url else 'ip_url'
+
+                    if cam_data.get(search_key) == ip_url:  # Usa la llave correcta.
+                        # Asegurar consistencia en la estructura.
+                        cam_data['ambiente'] = ambiente_nombre
+                        cam_data['piso'] = piso_nombre
+                        return cam_uuid, cam_data
     return None, None
 
 def get_camera_by_uuid(camera_uuid):
