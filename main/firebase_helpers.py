@@ -20,13 +20,6 @@ if not firebase_admin._apps:
 def get_camera_by_ip(ip_url, search_by_full_url=False):
     """
     Busca una cámara por IP/URL o por full_url en la base de datos.
-
-    Args:
-        ip_url (str):  La IP o URL a buscar (o full_url si search_by_full_url es True).
-        search_by_full_url(bool): Si es True, busca por full_url en lugar de ip_url.
-
-    Returns:
-        tuple: (uuid, camera_data)  o (None, None) si no se encuentra.
     """
     ref = db.reference('ambientes')
     snapshot = ref.get()
@@ -46,11 +39,9 @@ def get_camera_by_ip(ip_url, search_by_full_url=False):
                     continue
 
                 for cam_uuid, cam_data in camaras_data.items():
-                    # Determina la llave a usar para la búsqueda.
                     search_key = 'full_url' if search_by_full_url else 'ip_url'
 
-                    if cam_data.get(search_key) == ip_url:  # Usa la llave correcta.
-                        # Asegurar consistencia en la estructura.
+                    if cam_data.get(search_key) == ip_url:
                         cam_data['ambiente'] = ambiente_nombre
                         cam_data['piso'] = piso_nombre
                         return cam_uuid, cam_data
