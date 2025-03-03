@@ -87,85 +87,6 @@ def access_denied(request):
 
 
 
-def generate_random_color():
-    return tuple(np.random.randint(0, 255, 3).tolist())
-
-
-
-
-
-
-
-def simplify_polygon(polygon, target_points=6):
-    epsilon = 0.01 * cv2.arcLength(polygon, True)
-    approx = cv2.approxPolyDP(polygon, epsilon, True)
-    while len(approx) > target_points:
-        epsilon *= 1.1
-        approx = cv2.approxPolyDP(polygon, epsilon, True)
-    if len(approx) < 3:  # Cannot form a polygon with less than 3 points
-        return None
-    if len(approx) < target_points:
-        approx = np.array(approx).squeeze()
-        perimeter = cv2.arcLength(approx, True)
-        target_distance = perimeter / target_points
-        new_points = []
-        for i in range(len(approx)):
-            p1 = approx[i]
-            p2 = approx[(i + 1) % len(approx)]
-            distance = np.linalg.norm(p1 - p2)
-            if distance > target_distance:
-                num_new_points = int(distance / target_distance)
-                for j in range(num_new_points):
-                    t = (j + 1) / (num_new_points + 1)
-                    new_point = (1 - t) * p1 + t * p2
-                    new_points.append(new_point)
-            new_points.append(p1)
-        approx = np.array(new_points)
-    return approx.squeeze()
-
-
-
-
-
-
-
-def quitar_poligono(request):
-    if request.method == 'POST':
-        polygon_id = request.POST.get('polygon_id')
-        # Remove from session
-        detections = request.session.get('detections', [])
-        manual_polygons = request.session.get('manual_polygons', [])
-        detections = [d for d in detections if d['id'] != polygon_id]
-        manual_polygons = [p for p in manual_polygons if p['id'] != polygon_id]
-        request.session['detections'] = detections
-        request.session['manual_polygons'] = manual_polygons
-
-        # Remove from database.json
-        camera_data = request.session.get('camera_data')
-        if camera_data:
-            ip_url = camera_data['ip_url']
-            db_data = load_json_data()
-            camera = None
-            for ambiente in db_data['ambientes']:
-                for piso, piso_data in ambiente['piso'].items():
-                    for cam in piso_data.get('camara', []):
-                        if cam['ip_url'] == ip_url:
-                            camera = cam
-                            break
-            if camera:
-                mesas = camera.get('mesas', [])
-                mesas = [m for m in mesas if m['id'] != polygon_id]
-                camera['mesas'] = mesas
-                save_json_data(db_data)
-
-        return JsonResponse({'success': True})
-
-    return JsonResponse({'error': 'Método no permitido'})
-
-JSON_FILE_PATH = os.path.join(settings.BASE_DIR, 'data', 'database.json')
-
-
-
 def logout_view(request):
     logout(request)
     return redirect('login')
@@ -299,6 +220,62 @@ def crear_form_view(request):
 
 #-----------------------------------------FLUJO CONFIGURACION DE CAMARAS-------------------------------------------------------
 
+
+
+def generate_random_color():
+    return tuple(np.random.randint(0, 255, 3).tolist())
+
+
+def simplify_polygon(polygon, target_points=6):
+    epsilon = 0.01 * cv2.arcLength(polygon, True)
+    approx = cv2.approxPolyDP(polygon, epsilon, True)
+    while len(approx) > target_points:
+        epsilon *= 1.1
+        approx = cv2.approxPolyDP(polygon, epsilon, True)
+    if len(approx) < 3:  # Cannot form a polygon with less than 3 points
+        return None
+    if len(approx) < target_points:
+        approx = np.array(approx).squeeze()
+        perimeter = cv2.arcLength(approx, True)
+        target_distance = perimeter / target_points
+        new_points = []
+        for i in range(len(approx)):
+            p1 = approx[i]
+            p2 = approx[(i + 1) % len(approx)]
+            distance = np.linalg.norm(p1 - p2)
+            if distance > target_distance:
+                num_new_points = int(distance / target_distance)
+                for j in range(num_new_points):
+                    t = (j + 1) / (num_new_points + 1)
+                    new_point = (1 - t) * p1 + t * p2
+                    new_points.append(new_point)
+            new_points.append(p1)
+        approx = np.array(new_points)
+    return approx.squeeze()
+
+
+
+
+
+def quitar_poligono(request):
+    if request.method == 'POST':
+        polygon_id = request.POST.get('polygon_id')
+        # Remove from session
+        detections = request.session.get('detections', [])
+        manual_polygons = request.session.get('manual_polygons', [])
+        detections = [d for d in detections if d['id'] != polygon_id]
+        manual_polygons = [p for p in manual_polygons if p['id'] != polygon_id]
+        request.session['detections'] = detections
+        request.session['manual_polygons'] = manual_polygons
+        #No se usa database.json
+        return JsonResponse({'success': True})
+
+    return JsonResponse({'error': 'Método no permitido'})
+
+
+
+
+
 def configurar_deteccion(request):
     ref = db.reference('ambientes')
     snapshot = ref.get()
@@ -321,14 +298,8 @@ def configurar_deteccion(request):
                 for cam_uuid, cam_data in camaras_data.items():
                     # Mostrar solo cámaras con estado "calibrated"
                     if cam_data.get('status') == 'calibrated':
-                        # Construir la URL completa si es necesario
-                        if cam_data.get('username') and cam_data.get('password'):
-                            full_url = f"{cam_data.get('protocol', 'http').lower()}://{cam_data.get('username')}:{cam_data.get('password')}@{cam_data.get('ip_url')}"
-                        else:
-                            full_url = cam_data.get('full_url') or cam_data.get('ip_url')  # Usar full_url si existe, sino ip_url
-                            if not (full_url.lower().startswith("http://") or full_url.lower().startswith("https://") or full_url.lower().startswith("rtsp://")):
-                                full_url = f"{cam_data.get('protocol','http').lower()}://{full_url}"
-
+                        # Usar la full url directamente
+                        full_url = cam_data.get('full_url')
 
                         camaras_calibradas.append({
                             'ambiente': ambiente_nombre,
@@ -341,7 +312,6 @@ def configurar_deteccion(request):
 
     context = {'camaras': camaras_calibradas}
     return render(request, 'configurar_deteccion.html', context)
-
 
 
 
@@ -628,32 +598,12 @@ def etiquetar_poligono(request):
         manual_polygons = request.session.get('manual_polygons', [])
         
         updated = False
-        
+        #Ya no se usa database.json
         for detection in detections + manual_polygons:
             if detection['id'] == polygon_id:
                 detection['label'] = new_label
                 updated = True
                 break
-
-        # Update in database.json if necessary
-        camera_data = request.session.get('camera_data')
-        if camera_data:
-            ip_url = camera_data['ip_url']
-            db_data = load_json_data()
-            camera = None
-            for ambiente in db_data['ambientes']:
-                for piso, piso_data in ambiente['piso'].items():
-                    for cam in piso_data.get('camara', []):
-                        if cam['ip_url'] == ip_url:
-                            camera = cam
-                            break
-            if camera:
-                mesas = camera.get('mesas', [])
-                for mesa in mesas:
-                    if mesa['id'] == polygon_id:
-                        mesa['label'] = new_label
-                        save_json_data(db_data)
-                        break
         
         if updated:
             request.session['detections'] = detections
@@ -663,6 +613,7 @@ def etiquetar_poligono(request):
         return JsonResponse({'error': 'Polígono no encontrado'})
     
     return JsonResponse({'error': 'Método no permitido'})
+
 
 def quitar_poligono(request):
     if request.method == 'POST':
@@ -719,6 +670,9 @@ def iniciar_tracking(request):
         return JsonResponse({'success': True, 'camera_uuid': camera_uuid})
 
     return JsonResponse({'error': 'Método no permitido'})
+
+
+
 
 
 #-----------------------------------------FLUJO CONFIGURACION DE CAMARAS - EOF-------------------------------------------------------
@@ -1126,47 +1080,36 @@ def capture_frame(ip_port):
         print(f"Error capturing frame: {str(e)}")
         return None
 
-
-
-def load_json_data():
-    if os.path.exists(JSON_FILE_PATH):
-        with open(JSON_FILE_PATH, 'r') as file:
-            return json.load(file)
-    return {"ambientes": []}
-
-def save_json_data(data):
-    os.makedirs(os.path.dirname(JSON_FILE_PATH), exist_ok=True)
-    with open(JSON_FILE_PATH, 'w') as file:
-        json.dump(data, file, indent=2)
-
-
-def update_camera_data(ambiente, piso, camera_data):
-    data = load_json_data()
-    for amb in data["ambientes"]:
-        if amb["nombreAmbiente"] == ambiente:
-            if piso not in amb["piso"]:
-                amb["piso"][piso] = {}
-            if "camara" not in amb["piso"][piso]:
-                amb["piso"][piso]["camara"] = []
+# #/////////////////////////////////////////////////////////////////////////////////////////////////////
+# def update_camera_data(ambiente, piso, camera_data):
+#     data = load_json_data()
+#     for amb in data["ambientes"]:
+#         if amb["nombreAmbiente"] == ambiente:
+#             if piso not in amb["piso"]:
+#                 amb["piso"][piso] = {}
+#             if "camara" not in amb["piso"][piso]:
+#                 amb["piso"][piso]["camara"] = []
             
-            for cam in amb["piso"][piso]["camara"]:
-                if cam["ip_url"] == camera_data["ip_url"]:
-                    cam.update(camera_data)
-                    break
-            else:
-                amb["piso"][piso]["camara"].append(camera_data)
-            break
-    else:
-        new_ambiente = {
-            "nombreAmbiente": ambiente,
-            "piso": {
-                piso: {
-                    "camara": [camera_data]
-                }
-            }
-        }
-        data["ambientes"].append(new_ambiente)
-    save_json_data(data)
+#             for cam in amb["piso"][piso]["camara"]:
+#                 if cam["ip_url"] == camera_data["ip_url"]:
+#                     cam.update(camera_data)
+#                     break
+#             else:
+#                 amb["piso"][piso]["camara"].append(camera_data)
+#             break
+#     else:
+#         new_ambiente = {
+#             "nombreAmbiente": ambiente,
+#             "piso": {
+#                 piso: {
+#                     "camara": [camera_data]
+#                 }
+#             }
+#         }
+#         data["ambientes"].append(new_ambiente)
+#     save_json_data(data)
+
+# #/////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 def supervisar_camara(request, camera_uuid):
