@@ -8,124 +8,124 @@
     <h2>Calibración de Cámara</h2>
 
     {% if step == '1' %}
-    <h3>Paso 1: Reconocimiento de cámara</h3>
+        <h3>Paso 1: Reconocimiento de cámara</h3>
 
-    <div class="row">
-        <div class="col-md-6">
-            <form method="post" id="camera-form">
-                {% csrf_token %}
+        <div class="row">
+            <div class="col-md-6">
+                <form method="post" id="camera-form">
+                    {% csrf_token %}
 
-                <div class="mb-3">
-                    <label for="protocol" class="form-label">Protocolo</label>
-                    <select class="form-select" id="protocol" name="protocol" required>
-                        {% for option in protocol_options %}
-                            <option value="{{ option }}">{{ option|upper }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+                    <div class="mb-3">
+                        <label for="protocol" class="form-label">Protocolo</label>
+                        <select class="form-select" id="protocol" name="protocol" required>
+                            {% for option in protocol_options %}
+                                <option value="{{ option }}">{{ option|upper }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-                <div id="credentials-section" style="display: none;">
-                     <div class="mb-3">
-                        <label for="username" class="form-label">Usuario</label>
-                        <input type="text" class="form-control" id="username" name="username">
+                    <div id="credentials-section" style="display: none;">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Usuario</label>
+                            <input type="text" class="form-control" id="username" name="username">
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Contraseña</label>
+                            <input type="password" class="form-control" id="password" name="password">
+                        </div>
                     </div>
                     <div class="mb-3">
-                        <label for="password" class="form-label">Contraseña</label>
-                        <input type="password" class="form-control" id="password" name="password">
+                       <a href="#" id="toggle-credentials">¿Usar credenciales?</a>
                     </div>
-                </div>
-                <div class="mb-3">
-                  <a href="#" id="toggle-credentials">¿Usar credenciales?</a>
-                </div>
 
-                <div class="mb-3">
-                    <label for="ip_port" class="form-label">
-                        IP:Puerto/Ruta del stream de la cámara
-                        <i class="bi bi-question-circle-fill"
-                           data-bs-toggle="tooltip"
-                           data-bs-placement="right"
-                           data-bs-html="true"
-                           title="
-                              <b>Ejemplos:</b><br>
-                              rtsp://192.168.31.79:8554/live<br>
-                              http://192.168.31.79:8554/live<br>
-                              rtsp://admin:12345@172.24.132.8:8554/video
-                           "></i>
-                    </label>
-                    <input type="text" class="form-control" id="ip_port" name="ip_port" required>
-                </div>
-                <div class="mb-3">
-                    <label for="camera_name" class="form-label">Nombre de la cámara</label>
-                    <input type="text" class="form-control" id="camera_name" name="camera_name" required>
-                </div>
+                    <div class="mb-3">
+                        <label for="ip_port" class="form-label">
+                            IP:Puerto/Ruta del stream de la cámara
+                            <i class="bi bi-question-circle-fill"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="right"
+                               data-bs-html="true"
+                               title="
+                                <b>Ejemplos:</b><br>
+                                rtsp://192.168.31.79:8554/live<br>
+                                http://192.168.31.79:8554/live<br>
+                                rtsp://admin:12345@172.24.132.8:8554/video
+                               "></i>
+                        </label>
+                        <input type="text" class="form-control" id="ip_port" name="ip_port" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="camera_name" class="form-label">Nombre de la cámara</label>
+                        <input type="text" class="form-control" id="camera_name" name="camera_name" required>
+                    </div>
 
-                <div class="mb-3">
-                    <label for="ambiente" class="form-label">Ambiente</label>
-                    <select class="form-select" id="ambiente" name="ambiente" required>
-                        <option value="">Seleccione un ambiente</option>
-                        {% for ambiente in ambientes_data %}
-                            <option value="{{ ambiente.nombreAmbiente }}">{{ ambiente.nombreAmbiente }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label for="piso" class="form-label">Piso</label>
-                    <select class="form-select" id="piso" name="piso" required>
-                        <option value="">Seleccione un piso</option>
+                    <div class="mb-3">
+                        <label for="ambiente" class="form-label">Ambiente</label>
+                        <select class="form-select" id="ambiente" name="ambiente" required>
+                            <option value="">Seleccione un ambiente</option>
+                            {% for ambiente in ambientes_data %}
+                                <option value="{{ ambiente.nombreAmbiente }}">{{ ambiente.nombreAmbiente }}</option>
+                            {% endfor %}
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="piso" class="form-label">Piso</label>
+                        <select class="form-select" id="piso" name="piso" required>
+                            <option value="">Seleccione un piso</option>
+                        </select>
+                    </div>
+
+                    <div class="d-flex align-items-center">
+                        <button type="submit" class="btn btn-primary me-2">Conectar</button>
+                        <button type="button" id="continue-btn" class="btn btn-primary" style="display: none;">Continuar</button>
+                    </div>
+                </form>
+
+            </div>
+            <div class="col-md-6">
+                <div id="stream-container" class="mt-3" style="display: none;">
                 </div>
-
-                <div class="d-flex align-items-center">
-                    <button type="submit" class="btn btn-primary me-2">Conectar</button>
-                    <button type="button" id="continue-btn" class="btn btn-primary" style="display: none;">Continuar</button>
-                </div>
-            </form>
-
+            </div>
         </div>
-        <div class="col-md-6">
-             <div id="stream-container" class="mt-3" style="display: none;">
-             </div>
-        </div>
-    </div>
 
-    <script>
-      // Initialize Bootstrap Tooltips
-      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-      var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl)
-      })
-    </script>
+        <script>
+        // Initialize Bootstrap Tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+         return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+        </script>
 
-    <script>
-        const ambientesData = {{ ambientes_data_json|safe }};
+        <script>
+         const ambientesData = {{ ambientes_data_json|safe }};
 
-        document.addEventListener('DOMContentLoaded', function() {
-            // Limpiar el indicador al iniciar el flujo en el paso 1
-            sessionStorage.removeItem('calibration_incomplete');
+         document.addEventListener('DOMContentLoaded', function() {
+             // Limpiar el indicador al iniciar el flujo en el paso 1
+             sessionStorage.removeItem('calibration_incomplete');
 
-            const cameraForm = document.getElementById('camera-form');
-            const continueBtn = document.getElementById('continue-btn');
-            const streamContainer = document.getElementById('stream-container');
+             const cameraForm = document.getElementById('camera-form');
+             const continueBtn = document.getElementById('continue-btn');
+             const streamContainer = document.getElementById('stream-container');
 
-            // Cargar pisos dinámicamente cuando se seleccione un ambiente
-            const ambienteSelect = document.getElementById('ambiente');
-            const pisoSelect = document.getElementById('piso');
+             // Cargar pisos dinámicamente cuando se seleccione un ambiente
+             const ambienteSelect = document.getElementById('ambiente');
+             const pisoSelect = document.getElementById('piso');
 
-            ambienteSelect.addEventListener('change', function() {
-                const selectedAmbiente = ambienteSelect.value;
-                const ambiente = ambientesData.find(a => a.nombreAmbiente.trim().toLowerCase() === selectedAmbiente.trim().toLowerCase());
-                pisoSelect.innerHTML = '<option value="">Seleccione un piso</option>';
-                if (ambiente) {
-                    ambiente.pisos.forEach(piso => {
-                        const option = document.createElement('option');
-                        option.value = piso;
-                        option.textContent = piso;
-                        pisoSelect.appendChild(option);
-                    });
-                }
-            });
+             ambienteSelect.addEventListener('change', function() {
+                 const selectedAmbiente = ambienteSelect.value;
+                 const ambiente = ambientesData.find(a => a.nombreAmbiente.trim().toLowerCase() === selectedAmbiente.trim().toLowerCase());
+                 pisoSelect.innerHTML = '<option value="">Seleccione un piso</option>';
+                 if (ambiente) {
+                     ambiente.pisos.forEach(piso => {
+                         const option = document.createElement('option');
+                         option.value = piso;
+                         option.textContent = piso;
+                         pisoSelect.appendChild(option);
+                     });
+                 }
+             });
 
-            // --- Toggle Credentials ---
+           // --- Toggle Credentials ---
             const credentialsSection = document.getElementById('credentials-section');
             const toggleCredentialsLink = document.getElementById('toggle-credentials');
 
@@ -137,462 +137,455 @@
                 } else {
                     credentialsSection.style.display = 'none';
                     toggleCredentialsLink.textContent = "¿Usar credenciales?";
-                    // Clear the fields when hiding.  Good for security!
+                    // Clear the fields when hiding. Good for security!
                     document.getElementById('username').value = "";
                     document.getElementById('password').value = "";
                 }
             });
 
+             if (cameraForm) {
+                 cameraForm.addEventListener('submit', function(e) {
+                     e.preventDefault();
+                     const formData = new FormData(this);
 
+                     fetch('{% url "calibrar_camara_paso1" %}', {
+                         method: 'POST',
+                         body: formData,
+                         headers: {
+                             'X-Requested-With': 'XMLHttpRequest',
+                             'X-CSRFToken': '{{ csrf_token }}'
+                         }
+                     })
+                     .then(response => response.json())
+                     .then(data => {
+                         if (data.success) {
+                             console.log('Conexión exitosa:', data.message);
+                             if (streamContainer) {
+                                 streamContainer.innerHTML = `<img id="stream" src="{% url 'camera_stream' %}?ip_port=${encodeURIComponent(formData.get('ip_port'))}" alt="Camera Stream">`;
+                                 streamContainer.style.display = 'block';
+                             } else {
+                                 console.error('El elemento stream-container no existe en el DOM');
+                                 alert('Error: No se pudo mostrar el stream de la cámara');
+                             }
+                             continueBtn.style.display = 'inline-block';
+                         } else {
+                             console.error('Error en la conexión:', data.message);
+                             alert(`Error: ${data.message}`);
+                         }
+                     })
+                     .catch(error => {
+                         console.error('Error en la solicitud:', error);
+                         alert('Ocurrió un error al intentar conectar con la cámara');
+                     });
+                 });
+             } else {
+                 console.error('El formulario de la cámara no existe en el DOM');
+             }
 
-            if (cameraForm) {
-                cameraForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    const formData = new FormData(this);
+             if (continueBtn) {
+                 continueBtn.addEventListener('click', function() {
+                     window.location.href = '{% url "calibrar_camara_paso3" %}';
+                 });
+             }
+         });
+        </script>
 
-                    fetch('{% url "calibrar_camara_paso1" %}', {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'X-CSRFToken': '{{ csrf_token }}'
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            console.log('Conexión exitosa:', data.message);
-                            if (streamContainer) {
-                                streamContainer.innerHTML = `<img id="stream" src="{% url 'camera_stream' %}?ip_port=${encodeURIComponent(formData.get('ip_port'))}" alt="Camera Stream">`;
-                                streamContainer.style.display = 'block';
-                            } else {
-                                console.error('El elemento stream-container no existe en el DOM');
-                                alert('Error: No se pudo mostrar el stream de la cámara');
-                            }
-                            continueBtn.style.display = 'inline-block';
-                        } else {
-                            console.error('Error en la conexión:', data.message);
-                            alert(`Error: ${data.message}`);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error en la solicitud:', error);
-                        alert('Ocurrió un error al intentar conectar con la cámara');
-                    });
-                });
-            } else {
-                console.error('El formulario de la cámara no existe en el DOM');
-            }
+    {% elif step == '3' %}
+        <h3>Paso 3: Obtención de Pixeles por Metro</h3>
 
-            if (continueBtn) {
-                continueBtn.addEventListener('click', function() {
-                    window.location.href = '{% url "calibrar_camara_paso3" %}';
-                });
-            }
-        });
-    </script>
-
-
-
-{% elif step == '3' %}
-    <h3>Paso 3: Obtención de Pixeles por Metro</h3>
-
-    <div class="row">
-        <div class="col-md-6">
-            <div id="stream-container" style="position: relative;">
-                <img id="stream" src="{% url 'camera_stream' %}?ip_port={{ ip_port }}" alt="Camera Stream" class="img-fluid">
-                <canvas id="line-canvas" width="640" height="480" style="position: absolute; top: 0; left: 0;"></canvas>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <div class="mb-3">
-                <label class="form-label">Seleccione el método de cálculo:</label>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="calculation_method" id="method_aruco" value="aruco" checked>
-                    <label class="form-check-label" for="method_aruco">
-                        Usar Marcador ArUco
-                    </label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="calculation_method" id="method_line" value="line">
-                    <label class="form-check-label" for="method_line">
-                        Dibujar Línea Manualmente
-                    </label>
+        <div class="row">
+            <div class="col-md-6">
+                <div id="stream-container" style="position: relative;">
+                    <img id="stream" src="{% url 'camera_stream' %}?ip_port={{ ip_port }}" alt="Camera Stream" class="img-fluid">
+                    <canvas id="line-canvas" style="position: absolute; top: 0; left: 0;"></canvas>
                 </div>
             </div>
 
-            <div id="aruco-section">
-                <p id="capture-instructions">Capture 1 imagen con el ArUco cerca y 1 imagen con el ArUco lejos.</p>
-                <button id="capture-near-btn" class="btn btn-primary mb-2">Capturar cerca</button>
-                <button id="capture-far-btn" class="btn btn-primary mb-2">Capturar lejos</button>
-                <p id="capture-count-near">Capturas cerca: 0/1</p>
-                <p id="capture-count-far">Capturas lejos: 0/1</p>
-            </div>
-
-            <div id="line-section" style="display: none;">
-                <p>Dibuje una línea en la imagen y especifique su longitud real.</p>
+            <div class="col-md-6">
                 <div class="mb-3">
-                    <label for="line-length" class="form-label">Longitud de la línea (metros):</label>
-                    <input type="number" class="form-control" id="line-length" name="line_length" step="0.01" min="0">
+                    <label class="form-label">Seleccione el método de cálculo:</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="calculation_method" id="method_aruco" value="aruco" checked>
+                        <label class="form-check-label" for="method_aruco">
+                            Usar Marcador ArUco
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="calculation_method" id="method_line" value="line">
+                        <label class="form-check-label" for="method_line">
+                            Dibujar Línea Manualmente
+                        </label>
+                    </div>
                 </div>
-                 <button id="start-drawing-btn" class="btn btn-info mb-2">Comenzar a Dibujar</button>
+
+                <div id="aruco-section">
+                    <p id="capture-instructions">Capture 1 imagen con el ArUco cerca y 1 imagen con el ArUco lejos.</p>
+                    <button id="capture-near-btn" class="btn btn-primary mb-2">Capturar cerca</button>
+                    <button id="capture-far-btn" class="btn btn-primary mb-2">Capturar lejos</button>
+                    <p id="capture-count-near">Capturas cerca: 0/1</p>
+                    <p id="capture-count-far">Capturas lejos: 0/1</p>
+                </div>
+
+                <div id="line-section" style="display: none;">
+                    <p>Dibuje una línea en la imagen y especifique su longitud real.</p>
+                    <div class="mb-3">
+                        <label for="line-length" class="form-label">Longitud de la línea (metros):</label>
+                        <input type="number" class="form-control" id="line-length" name="line_length" step="0.01" min="0">
+                    </div>
+                    <button id="start-drawing-btn" class="btn btn-info mb-2">Comenzar a Dibujar</button>
                 </div>
 
                 <button id="calculate-btn" class="btn btn-success mb-2" disabled>Calcular Pixeles por Metro</button>
 
-            <div id="calculation-result" style="display: none;">
-                <h4>Resultado:</h4>
-                <p id="pixels-per-meter"></p>
-            </div>
+                <div id="calculation-result" style="display: none;">
+                    <h4>Resultado:</h4>
+                    <p id="pixels-per-meter"></p>
+                </div>
                 <a href="{% url 'calibrar_camara_paso1' %}" class="btn btn-secondary">Atrás</a>
-                <button  class="btn btn-success" id="finish-btn" style="display: none;">Finalizar</button>
+                <button class="btn btn-success" id="finish-btn" style="display: none;">Finalizar</button>
+            </div>
         </div>
-    </div>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const captureNearBtn = document.getElementById('capture-near-btn');
-    const captureFarBtn = document.getElementById('capture-far-btn');
-    const calculateBtn = document.getElementById('calculate-btn');
-    const captureCountNear = document.getElementById('capture-count-near');
-    const captureCountFar = document.getElementById('capture-count-far');
-    const calculationResult = document.getElementById('calculation-result');
-    const pixelsPerMeter = document.getElementById('pixels-per-meter');
-    const finishBtn = document.getElementById('finish-btn');
-    const videoStream = document.getElementById('stream');
 
-
-    // --- Method Selection ---
-    const arucoSection = document.getElementById('aruco-section');
-    const lineSection = document.getElementById('line-section');
-    const methodArucoRadio = document.getElementById('method_aruco');
-    const methodLineRadio = document.getElementById('method_line');
-    const startDrawingBtn = document.getElementById('start-drawing-btn'); // New button
-
-    // --- Line Drawing Variables ---
-    const lineCanvas = document.getElementById('line-canvas');
-    const lineCtx = lineCanvas.getContext('2d');
-    let isDrawingLine = false;
-    let linePoints = [];
-
-    // --- ArUco Capture Variables ---  Declare *outside* the functions.
-    let capturesNear = 0;
-    let capturesFar = 0;
-
-   function updateCalculationMethod() {
-        console.log("updateCalculationMethod called");
-        if (methodArucoRadio.checked) {
-            console.log("ArUco method selected");
-            arucoSection.style.display = 'block';
-            lineSection.style.display = 'none';
-            calculateBtn.disabled = !(capturesNear >= 1 && capturesFar >= 1);
-            // Reset line drawing state
-            isDrawingLine = false;
-            linePoints = [];
-            lineCtx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
-        } else {
-            console.log("Line method selected");
-            arucoSection.style.display = 'none';
-            lineSection.style.display = 'block';
-            calculateBtn.disabled = true; // Disable until line is drawn
-            // Reset ArUco capture counts
-            capturesNear = 0;
-            capturesFar = 0;
-            updateCaptureCount(true, 0); // Update UI for near captures
-            updateCaptureCount(false, 0); // Update UI for far captures
-
-        }
-    }
-
-    function updateCaptureCount(isNear, count) {
-        console.log(`updateCaptureCount: isNear=${isNear}, count=${count}`);
-        if (isNear) {
-            capturesNear = count;
-            captureCountNear.textContent = `Capturas cerca: ${capturesNear}`;
-        } else {
-            capturesFar = count;
-            captureCountFar.textContent = `Capturas lejos: ${capturesFar}`;
-        }
-        console.log(`  capturesNear=${capturesNear}, capturesFar=${capturesFar}`);
-      if(methodArucoRadio.checked){
-        calculateBtn.disabled = !(capturesNear >= 1 && capturesFar >= 1);
-         console.log("calculateBtn.disabled (ArUco):", calculateBtn.disabled);
-      } else{
-        console.log("calculateBtn.disabled (Line):", calculateBtn.disabled);
-      }
-    }
-
-      function drawLine() {
-        lineCtx.clearRect(0, 0, lineCanvas.width, lineCanvas.height); // Clear previous drawings
-        if (linePoints.length === 2) {
-            lineCtx.beginPath();
-            lineCtx.moveTo(linePoints[0][0], linePoints[0][1]);
-            lineCtx.lineTo(linePoints[1][0], linePoints[1][1]);
-            lineCtx.strokeStyle = 'red';
-            lineCtx.lineWidth = 2;
-            lineCtx.stroke();
-            lineCtx.closePath();
-
-            // Draw circles at the endpoints
-            lineCtx.fillStyle = 'blue'; // Different color for endpoints
-            linePoints.forEach(point => {
-              lineCtx.beginPath();
-              lineCtx.arc(point[0], point[1], 5, 0, 2 * Math.PI); // Radius 5
-              lineCtx.fill();
-              lineCtx.closePath();
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // --- Constantes y Variables (Como antes) ---
+                const captureNearBtn = document.getElementById('capture-near-btn');
+                const captureFarBtn = document.getElementById('capture-far-btn');
+                const calculateBtn = document.getElementById('calculate-btn');
+                const captureCountNear = document.getElementById('capture-count-near');
+                const captureCountFar = document.getElementById('capture-count-far');
+                const calculationResult = document.getElementById('calculation-result');
+                const pixelsPerMeter = document.getElementById('pixels-per-meter');
+                const finishBtn = document.getElementById('finish-btn');
+                const videoStream = document.getElementById('stream');
+        
+                // --- Method Selection ---
+                const arucoSection = document.getElementById('aruco-section');
+                const lineSection = document.getElementById('line-section');
+                const methodArucoRadio = document.getElementById('method_aruco');
+                const methodLineRadio = document.getElementById('method_line');
+                const startDrawingBtn = document.getElementById('start-drawing-btn');
+        
+                // --- Line Drawing Variables ---
+                const lineCanvas = document.getElementById('line-canvas');
+                const lineCtx = lineCanvas.getContext('2d');
+                let isDrawingLine = false;
+                let linePoints = [];
+                // --- ArUco Capture Variables ---
+                let capturesNear = 0;
+                let capturesFar = 0;
+        
+        
+                // --- NUEVAS VARIABLES PARA EL CÁLCULO DEL FACTOR DE ESCALA ---
+                let originalWidth = 640;  // Ancho original del stream (de gen_frames)
+                let originalHeight = 480; // Alto original del stream
+        
+                function updateCalculationMethod() {
+                    console.log("updateCalculationMethod called");
+                    if (methodArucoRadio.checked) {
+                        console.log("ArUco method selected");
+                        arucoSection.style.display = 'block';
+                        lineSection.style.display = 'none';
+                        calculateBtn.disabled = !(capturesNear >= 1 && capturesFar >= 1);
+                        // Reset line drawing state
+                        isDrawingLine = false;
+                        linePoints = [];
+                        lineCtx.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
+                    } else {
+                        console.log("Line method selected");
+                        arucoSection.style.display = 'none';
+                        lineSection.style.display = 'block';
+                        calculateBtn.disabled = true; // Disable until line is drawn
+                        // Reset ArUco capture counts
+                        capturesNear = 0;
+                        capturesFar = 0;
+                        updateCaptureCount(true, 0); // Update UI for near captures
+                        updateCaptureCount(false, 0); // Update UI for far captures
+                    }
+                    resizeCanvas(); // VERY IMPORTANT: Ensure canvas size is correct.
+                }
+        
+                function updateCaptureCount(isNear, count) {
+                    console.log(`updateCaptureCount: isNear=${isNear}, count=${count}`);
+                    if (isNear) {
+                        capturesNear = count;
+                        captureCountNear.textContent = `Capturas cerca: ${capturesNear}`;
+                    } else {
+                        capturesFar = count;
+                        captureCountFar.textContent = `Capturas lejos: ${capturesFar}`;
+                    }
+                    console.log(` capturesNear=${capturesNear}, capturesFar=${capturesFar}`);
+                    if(methodArucoRadio.checked){
+                        calculateBtn.disabled = !(capturesNear >= 1 && capturesFar >= 1);
+                        console.log("calculateBtn.disabled (ArUco):", calculateBtn.disabled);
+                    } else{
+                        console.log("calculateBtn.disabled (Line):", calculateBtn.disabled);
+                    }
+                }
+                function drawLine() {
+                    lineCtx.clearRect(0, 0, lineCanvas.width, lineCanvas.height); // Clear previous drawings
+                    if (linePoints.length === 2) {
+                        lineCtx.beginPath();
+                        lineCtx.moveTo(linePoints[0][0], linePoints[0][1]);
+                        lineCtx.lineTo(linePoints[1][0], linePoints[1][1]);
+                        lineCtx.strokeStyle = 'red';
+                        lineCtx.lineWidth = 2;
+                        lineCtx.stroke();
+                        lineCtx.closePath();
+        
+                        // Draw circles at the endpoints
+                        lineCtx.fillStyle = 'blue'; // Different color for endpoints
+                        linePoints.forEach(point => {
+                            lineCtx.beginPath();
+                            lineCtx.arc(point[0], point[1], 5, 0, 2 * Math.PI); // Radius 5
+                            lineCtx.fill();
+                            lineCtx.closePath();
+                        });
+        
+                    } else if (linePoints.length === 1){
+                        //If is drawing, draw a thicker, different colored line
+                        lineCtx.beginPath();
+                        lineCtx.moveTo(linePoints[0][0], linePoints[0][1]);
+                        lineCtx.lineTo(linePoints[0][0], linePoints[0][1]);  // Draw a point
+                        lineCtx.strokeStyle = 'green';
+                        lineCtx.lineWidth = 4;
+                        lineCtx.stroke();
+                        lineCtx.closePath();
+        
+                        // Draw circles at the endpoints
+                        lineCtx.fillStyle = 'blue'; // Different color for endpoints
+                        lineCtx.beginPath();
+                        lineCtx.arc(linePoints[0][0], linePoints[0][1], 5, 0, 2 * Math.PI); // Radius 5
+                        lineCtx.fill();
+                        lineCtx.closePath();
+                    }
+                }
+        
+        
+                // --- EVENT LISTENER PARA EL CLIC (MODIFICADO) ---
+                lineCanvas.addEventListener('click', function(e) {
+                    if (!isDrawingLine) return;
+        
+                    const rect = lineCanvas.getBoundingClientRect();
+        
+                    // --- CÁLCULO DEL FACTOR DE ESCALA (AQUÍ ESTÁ LA CLAVE) ---
+                    const scaleX = originalWidth / rect.width;
+                    const scaleY = originalHeight / rect.height;
+        
+                    // --- AHORA USA LOS FACTORES DE ESCALA PARA AJUSTAR LAS COORDENADAS ---
+                    const x = (e.clientX - rect.left) * scaleX;
+                    const y = (e.clientY - rect.top) * scaleY;
+        
+                    linePoints.push([x, y]);
+                    drawLine();
+        
+                    if (linePoints.length === 2) {
+                        isDrawingLine = false;
+                        calculateBtn.disabled = false;
+                        console.log("Line drawing complete. Points:", linePoints);
+        
+                        // Store points in session (AJAX)
+                        fetch('{% url "store_line_points" %}', {
+                            method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRFToken': '{{ csrf_token }}',
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ points: linePoints })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log("store_line_points response:", data);
+                            if (!data.success) {
+                                alert("Error al guardar puntos: " + data.message);
+                            }
+                        });
+                    }
+                });
+        
+                startDrawingBtn.addEventListener('click', function() {
+                    console.log("startDrawingBtn clicked");
+                    isDrawingLine = true;
+                    linePoints = []; // Reset points
+                    lineCtx.clearRect(0, 0, lineCanvas.width, lineCanvas.height); // Clear canvas
+                    calculateBtn.disabled = true; // Disable until line is drawn
+                    alert('Haga clic en dos puntos en la imagen para dibujar la línea.');
+                });
+        
+                // --- Calculate Button Logic (Modified) ---
+                calculateBtn.addEventListener('click', function() {
+                     // Determine which method is selected and build the request accordingly
+                    let requestData = new URLSearchParams();
+        
+                    if (methodArucoRadio.checked) {
+                        requestData.append('action', 'calculate'); // ArUco method. Backend handles this.
+        
+                    } else if (methodLineRadio.checked) {
+                        requestData.append('action', 'calculate_line');
+                        const lineLength = document.getElementById('line-length').value;
+                        if(!lineLength || parseFloat(lineLength) <= 0){
+                            alert("Por favor, introduce una longitud válida para la línea.");
+                            return; // Stop if invalid length
+                        }
+                        requestData.append('line_length', lineLength); // Send line length
+                    }
+        
+                    fetch('{% url "calibrar_camara_paso3" %}', {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: requestData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            pixelsPerMeter.textContent = `Pixels por metro: ${data.pixels_per_meter.toFixed(2)}`;
+                            calculationResult.style.display = 'block';
+                            finishBtn.style.display = 'inline-block';
+        
+                        } else {
+                            alert(data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Ocurrió un error al calcular los pixels por metro');
+                    });
+                });
+        
+        
+                // --- FUNCIÓN resizeCanvas (MODIFICADA, más simple) ---
+                function resizeCanvas() {
+                    console.log("resizeCanvas called");
+                    lineCanvas.width = videoStream.clientWidth;  // Ajusta al tamaño del <img>
+                    lineCanvas.height = videoStream.clientHeight;
+                    drawLine(); // Redibuja si es necesario
+                }
+        
+                // --- Usa 'loadedmetadata' (más preciso que 'load') ---
+                videoStream.addEventListener('loadedmetadata', resizeCanvas);
+                window.addEventListener('resize', resizeCanvas);
+        
+                // --- Debouncing (opcional, pero recomendado) ---
+                let resizeTimeout;
+                window.addEventListener('resize', function() {
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(resizeCanvas, 100); // 100ms de retraso
+                });
+        
+                // --- ArUco Capture Logic --- (Sin cambios)
+                function captureImage(isNear) {
+                    console.log(`captureImage: isNear=${isNear}`);
+                    fetch('{% url "calibrar_camara_paso3" %}', {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: new URLSearchParams({
+                            'action': isNear ? 'capture_near' : 'capture_far'
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            updateCaptureCount(isNear, data.captures);
+                        } else {
+                            alert(data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Ocurrió un error al capturar la imagen');
+                    });
+                }
+        
+                captureNearBtn.addEventListener('click', () => captureImage(true));
+                captureFarBtn.addEventListener('click', () => captureImage(false));
+        
+                finishBtn.addEventListener('click', function() {
+                    window.location.href = '{% url "calibrar_camara_paso_final" %}';
+                });
+        
+                // Initial state and event listeners.
+                updateCalculationMethod();
+                methodArucoRadio.addEventListener('change', updateCalculationMethod);
+                methodLineRadio.addEventListener('change', updateCalculationMethod);
+        
+                // Initialize tooltips.
+                var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+                var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl)
+                });
+        
             });
-
-        } else if (linePoints.length === 1){
-            //If is drawing, draw a thicker, different colored line
-            lineCtx.beginPath();
-            lineCtx.moveTo(linePoints[0][0], linePoints[0][1]);
-            lineCtx.strokeStyle = 'green';
-            lineCtx.lineWidth = 4;
-            lineCtx.stroke();
-            lineCtx.closePath();
-
-             // Draw circles at the endpoints
-            lineCtx.fillStyle = 'blue'; // Different color for endpoints
-              lineCtx.beginPath();
-              lineCtx.arc(linePoints[0][0], linePoints[0][1], 5, 0, 2 * Math.PI); // Radius 5
-              lineCtx.fill();
-              lineCtx.closePath();
-        }
-     }
-
-     // Event listener for canvas clicks
-    lineCanvas.addEventListener('click', function(e) {
-        if (!isDrawingLine) return;
-
-        const rect = lineCanvas.getBoundingClientRect();
-        const scaleX = lineCanvas.width / rect.width;
-        const scaleY = lineCanvas.height / rect.height;
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
+        </script>
 
 
-        linePoints.push([x, y]);
-        drawLine(); // Draw the line so far
 
-        if (linePoints.length === 2) {
-            isDrawingLine = false; // Stop drawing after two points
-            calculateBtn.disabled = false; // Enable calculation
-            console.log("Line drawing complete. Points:", linePoints);
+    {% elif step == 'final' %}
+        <div class="text-center">
+            <h3>Calibración Completada</h3>
+            <div class="my-4">
+                <i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i>
+            </div>
+            <p class="lead">La calibración de la cámara se ha completado con éxito.</p>
+            <div class="mt-4">
+                <h4>Resumen de la Calibración:</h4>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">Cámara: <span id="camera-name"></span></li>
+                    <li class="list-group-item">Ambiente: <span id="ambiente"></span></li>
+                    <li class="list-group-item">Piso: <span id="piso"></span></li>
+                    <li class="list-group-item">Pixels por metro: <span id="pixels-per-meter"></span></li>
+                </ul>
+            </div>
+            <div class="mt-4">
+                <a href="{% url 'configuracion' %}" class="btn btn-primary">
+                    <i class="bi bi-arrow-left-circle me-2"></i>Volver a Configuración
+                </a>
+                <a href="{% url 'calibrar_camara_paso1' %}" class="btn btn-success">
+                    <i class="bi bi-camera me-2"></i>Calibrar otra cámara
+                </a>
+            </div>
+        </div>
 
-             // Store points in session (using AJAX)
-            fetch('{% url "store_line_points" %}', {  // Use the correct URL name
-                method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': '{{ csrf_token }}',
-                    'Content-Type': 'application/json', // Send as JSON
-                },
-                body: JSON.stringify({ points: linePoints })  // Send the points
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log("store_line_points response:", data);
-                 if (!data.success) {
-                     alert("Error al guardar puntos: " + data.message)
-                 }
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Rellenar los datos de la calibración
+                document.getElementById('camera-name').textContent = '{{ camera_name }}';
+                document.getElementById('ambiente').textContent = '{{ ambiente }}';
+                document.getElementById('piso').textContent = '{{ piso }}';
+                document.getElementById('pixels-per-meter').textContent = '{{ pixels_per_meter }}';
             });
-        }
-    });
-
-    startDrawingBtn.addEventListener('click', function() {
-        console.log("startDrawingBtn clicked");
-        isDrawingLine = true;
-        linePoints = []; // Reset points
-        lineCtx.clearRect(0, 0, lineCanvas.width, lineCanvas.height); // Clear canvas
-        calculateBtn.disabled = true; // Disable until line is drawn
-        alert('Haga clic en dos puntos en la imagen para dibujar la línea.');
-    });
-
-    // --- Calculate Button Logic (Modified) ---
-    calculateBtn.addEventListener('click', function() {
-        // Determine which method is selected and build the request accordingly
-        let requestData = new URLSearchParams();
-
-        if (methodArucoRadio.checked) {
-            requestData.append('action', 'calculate');  // ArUco method. Backend handles this.
-
-        } else if (methodLineRadio.checked) {
-           requestData.append('action', 'calculate_line');
-           const lineLength = document.getElementById('line-length').value;
-           if(!lineLength || parseFloat(lineLength) <= 0){
-                alert("Por favor, introduce una longitud válida para la línea.");
-                return; // Stop if invalid length
-           }
-            requestData.append('line_length', lineLength); // Send line length
-
-        }
-
-        fetch('{% url "calibrar_camara_paso3" %}', {  // Keep using the same endpoint
-            method: 'POST',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: requestData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                pixelsPerMeter.textContent = `Pixels por metro: ${data.pixels_per_meter.toFixed(2)}`;
-                calculationResult.style.display = 'block';
-                finishBtn.style.display = 'inline-block';
-
-            } else {
-                alert(data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Ocurrió un error al calcular los pixels por metro');
-        });
-    });
-      // Adapt canvas size when video loads or window resizes
-    function resizeCanvas() {
-      console.log("resizeCanvas called");
-        const videoWidth = videoStream.clientWidth;
-        const videoHeight = videoStream.clientHeight;
-        lineCanvas.width = videoWidth;
-        lineCanvas.height = videoHeight;
-         // Redraw line if present
-        drawLine();
-    }
-
-     videoStream.addEventListener('load', resizeCanvas);
-     window.addEventListener('resize', resizeCanvas);
-
-    // --- ArUco Capture Logic  ---
-    function captureImage(isNear) {
-        console.log(`captureImage: isNear=${isNear}`);
-        fetch('{% url "calibrar_camara_paso3" %}', {
-            method: 'POST',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: new URLSearchParams({
-                'action': isNear ? 'capture_near' : 'capture_far'
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                updateCaptureCount(isNear, data.captures);
-            } else {
-                alert(data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Ocurrió un error al capturar la imagen');
-        });
-    }
-
-    captureNearBtn.addEventListener('click', () => captureImage(true));
-    captureFarBtn.addEventListener('click', () => captureImage(false));
-
-    // --- Event listeners that require DOM elements ---
-    // These *must* be inside DOMContentLoaded
-    finishBtn.addEventListener('click', function() {
-        window.location.href = '{% url "calibrar_camara_paso_final" %}';
-    });
-
-     // Initial state and event listeners.  NOW INSIDE DOMContentLoaded
-    updateCalculationMethod(); // Call this *immediately* on load
-    methodArucoRadio.addEventListener('change', updateCalculationMethod);
-    methodLineRadio.addEventListener('change', updateCalculationMethod);
-
-       // Initialize tooltips.  This needs to be inside DOMContentLoaded.
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl)
-        });
-});
-
-</script>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-{% elif step == 'final' %}
-<div class="text-center">
-<h3>Calibración Completada</h3>
-<div class="my-4">
-<i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i>
-</div>
-<p class="lead">La calibración de la cámara se ha completado con éxito.</p>
-<div class="mt-4">
-<h4>Resumen de la Calibración:</h4>
-<ul class="list-group list-group-flush">
-<li class="list-group-item">Cámara: <span id="camera-name"></span></li>
-<li class="list-group-item">Ambiente: <span id="ambiente"></span></li>
-<li class="list-group-item">Piso: <span id="piso"></span></li>
-<li class="list-group-item">Pixels por metro: <span id="pixels-per-meter"></span></li>
-</ul>
-</div>
-<div class="mt-4">
-<a href="{% url 'configuracion' %}" class="btn btn-primary">
-<i class="bi bi-arrow-left-circle me-2"></i>Volver a Configuración
-</a>
-<a href="{% url 'calibrar_camara_paso1' %}" class="btn btn-success">
-<i class="bi bi-camera me-2"></i>Calibrar otra cámara
-</a>
-</div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Rellenar los datos de la calibración
-    document.getElementById('camera-name').textContent = '{{ camera_name }}';
-    document.getElementById('ambiente').textContent = '{{ ambiente }}';
-    document.getElementById('piso').textContent = '{{ piso }}';
-    document.getElementById('pixels-per-meter').textContent = '{{ pixels_per_meter }}';
-});
-</script>
-{% endif %}
+        </script>
+    {% endif %}
 </div>
 
 {% if step != '1' and step != 'final' %}
-<script>
-    window.addEventListener('beforeunload', function (e) {
-        // Mostrar alerta al usuario
-        e.preventDefault();
-        e.returnValue = 'Si sales ahora, perderás el progreso de la calibración.';
-    });
+    <script>
+        window.addEventListener('beforeunload', function (e) {
+            // Mostrar alerta al usuario
+            e.preventDefault();
+            e.returnValue = 'Si sales ahora, perderás el progreso de la calibración.';
+        });
 
-    window.addEventListener('unload', function (e) {
-        // Establecer una bandera en sessionStorage indicando que el usuario salió
-        sessionStorage.setItem('calibration_incomplete', 'true');
-    });
+        window.addEventListener('unload', function (e) {
+            // Establecer una bandera en sessionStorage indicando que el usuario salió
+            sessionStorage.setItem('calibration_incomplete', 'true');
+        });
 
-    window.addEventListener('load', function (e) {
-        if (sessionStorage.getItem('calibration_incomplete') === 'true') {
-            // Limpiar la bandera
-            sessionStorage.removeItem('calibration_incomplete');
+        window.addEventListener('load', function (e) {
+            if (sessionStorage.getItem('calibration_incomplete') === 'true') {
+                // Limpiar la bandera
+                sessionStorage.removeItem('calibration_incomplete');
 
-            // Redirigir a /configuracion/
-            window.location.href = '{% url "configuracion" %}';
-        }
-    });
-</script>
+                // Redirigir a /configuracion/
+                window.location.href = '{% url "configuracion" %}';
+            }
+        });
+    </script>
 {% endif %}
 {% endblock %}

@@ -733,23 +733,22 @@ def iniciar_tracking(request):
 
 
 #-----------------------------------------FLUJO CALIBRACION DE CAMARAS-------------------------------------------------------
-
 @login_required
 def calibrar_camara_paso1(request):
-    # Limpiar datos de calibración previos
+    # Limpiar datos de calibración previos (MUY IMPORTANTE)
     calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'pixels_per_meter_near',
-                        'pixels_per_meter_far', 'pixels_per_meter', 'username', 'password', 'protocol']
+                        'pixels_per_meter_far', 'pixels_per_meter', 'username', 'password', 'protocol', 'line_points']
     for key in calibration_keys:
         if key in request.session:
             del request.session[key]
 
-    # Obtener ambientes y pisos
+    # Obtener ambientes y pisos (asumiendo que esta función existe y funciona)
     ambientes_data = get_ambientes_and_pisos_from_db()
     ambientes_data_json = json.dumps(ambientes_data)
 
     context = {
         'step': '1',
-        'camera_connected': False,
+        'camera_connected': False,  # Consider removing this, as it's redundant with the session data
         'ambientes_data': ambientes_data,
         'ambientes_data_json': ambientes_data_json,
         'protocol_options': ['http', 'rtsp'],  # Opciones para el protocolo
@@ -762,7 +761,7 @@ def calibrar_camara_paso1(request):
         piso = request.POST.get('piso')
         username = request.POST.get('username')  # Get username
         password = request.POST.get('password')  # Get password
-        protocol = request.POST.get('protocol', 'http') # Get protocol, default to http
+        protocol = request.POST.get('protocol', 'http')  # Get protocol, default to http
 
         if not ip_port:
             return JsonResponse({'success': False, 'message': 'La URL del stream está vacía'})
@@ -774,34 +773,35 @@ def calibrar_camara_paso1(request):
             if not username and not password:
                 return JsonResponse({'success': False, 'message': 'La URL debe comenzar con http://, https://, o rtsp://'})
 
-        # Check for duplicate cameras.
+        # Check for duplicate cameras.  This is important to prevent issues later.
         camera_uuid, existing_camera_data = get_camera_by_ip(ip_port)
         if camera_uuid:
-            return JsonResponse({'success': False,
+             return JsonResponse({'success': False,
                                  'message': 'Ya existe una cámara con esta IP/URL en la base de datos.'})
 
-        # Construct the full URL *correctly*.
+
+        # Construct the full URL *correctly*.  This is VERY important for consistent behavior.
         if username and password:
-            # Remove any existing protocol://
+            # Remove any existing protocol://  (VERY IMPORTANT to avoid double protocols)
             ip_port = re.sub(r"^(https?|rtsp)://", "", ip_port, flags=re.IGNORECASE)
             full_url = f"{protocol.lower()}://{username}:{password}@{ip_port}"
         else:
             # If no username/password, use the provided ip_port directly.
             full_url = ip_port
             if not (full_url.lower().startswith("http://") or full_url.lower().startswith("https://") or full_url.lower().startswith("rtsp://")):
-                full_url = f"{protocol.lower()}://{full_url}" # Add protocol if missing.
-        
-        print(f"Full URL constructed: {full_url}") # Debug print
+                full_url = f"{protocol.lower()}://{full_url}"  # Add protocol if missing.
+
+        print(f"Full URL constructed: {full_url}")  # Debug print
 
         try:
             cap = cv2.VideoCapture(full_url)
             if not cap.isOpened():
                 logger.error(f"No se pudo abrir el stream: {full_url}")
                 return JsonResponse({'success': False,
-                                     'message': 'No se pudo abrir el stream.  Verifica la URL, las credenciales y que la cámara sea accesible.'})
+                                    'message': 'No se pudo abrir el stream. Verifica la URL, las credenciales y que la cámara sea accesible.'})
 
             frame_read = False
-            for _ in range(30):  # Try to read frames
+            for _ in range(30):  # Try to read frames (robustness)
                 ret, frame = cap.read()
                 if ret and frame is not None:
                     frame_read = True
@@ -810,28 +810,27 @@ def calibrar_camara_paso1(request):
             cap.release()
 
             if frame_read:
-                # Store data in session.  Store the *provided* ip_port, NOT the full_url.
+                # Store data in session. Store the *provided* ip_port, NOT the full_url.
                 request.session['ip_port'] = ip_port
                 request.session['camera_name'] = camera_name
                 request.session['ambiente'] = ambiente
                 request.session['piso'] = piso
                 request.session['username'] = username  # Store username
                 request.session['password'] = password  # Store password
-                request.session['protocol'] = protocol # Store Protocol.
+                request.session['protocol'] = protocol  # Store Protocol.
 
                 logger.info(f"Conexión exitosa. URL: {full_url}, IP_PORT: {ip_port}")
                 return JsonResponse({'success': True, 'message': 'Conexión exitosa'})
             else:
                 logger.error("No se pudo leer un frame después de 30 intentos")
                 return JsonResponse({'success': False,
-                                     'message': 'No se pudo leer un frame de la cámara después de varios intentos'})
+                                    'message': 'No se pudo leer un frame de la cámara después de varios intentos'})
 
         except Exception as e:
             logger.exception(f"Error inesperado: {str(e)}")
             return JsonResponse({'success': False, 'message': f'Error inesperado: {str(e)}'})
 
     return render(request, 'calibrar_camara.html', context)
-
 
 def camera_stream(request):
     ip_port = request.GET.get('ip_port')  # Get the *original* ip_port
@@ -842,7 +841,7 @@ def camera_stream(request):
     if not ip_port:
         return HttpResponseBadRequest("El parámetro 'ip_port' es obligatorio")
 
-    # Reconstruct full_url (SAME LOGIC AS ABOVE!)
+    # Reconstruct full_url (SAME LOGIC AS ABOVE!)  This ensures consistency.
     if username and password:
         # Remove any existing protocol://
         ip_port = re.sub(r"^(https?|rtsp)://", "", ip_port, flags=re.IGNORECASE)
@@ -852,16 +851,17 @@ def camera_stream(request):
         if not (full_url.lower().startswith("http://") or full_url.lower().startswith("https://") or full_url.lower().startswith("rtsp://")):
             full_url = f"{protocol.lower()}://{full_url}"
 
-    print(f"Usando URL para streaming: {full_url}")
+    print(f"Usando URL para streaming: {full_url}") # Debug print.  VERY helpful.
     return StreamingHttpResponse(gen_frames(full_url),
                                  content_type='multipart/x-mixed-replace; boundary=frame')
+
 
 
 @login_required
 def calibrar_camara_paso_final(request):
     # Verificar si se ha completado el paso 3
     if not request.session.get('pixels_per_meter'):
-        return redirect('calibrar_camara_paso1')
+        return redirect('calibrar_camara_paso1')  # Redirect to step 1 if not completed
 
     context = {
         'step': 'final',
@@ -870,8 +870,8 @@ def calibrar_camara_paso_final(request):
         'piso': request.session.get('piso', ''),
         'pixels_per_meter': request.session.get('pixels_per_meter', ''),
     }
-    # Limpiar datos de calibración
-    calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter','username','password','protocol']
+    # Limpiar datos de calibración (IMPORTANT to prevent issues if recalibrating)
+    calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter','username','password','protocol', 'line_points']
     for key in calibration_keys:
         if key in request.session:
             del request.session[key]
@@ -885,10 +885,10 @@ def gen_frames(camera_url, max_retries=3, retry_delay=2):
     Args:
         camera_url (str): URL completa del stream de la cámara (incluyendo protocolo, usuario/contraseña si es necesario).
         max_retries (int): Número máximo de intentos de reconexión.
-        retry_delay (int):  Tiempo de espera en segundos entre intentos de reconexión.
+        retry_delay (int): Tiempo de espera en segundos entre intentos de reconexión.
 
     Yields:
-        bytes:  Un frame de video codificado en JPEG, en formato multipart, o None si la conexión falla permanentemente.
+        bytes: Un frame de video codificado en JPEG, en formato multipart, o None si la conexión falla permanentemente.
     """
 
     retries = 0
@@ -896,17 +896,17 @@ def gen_frames(camera_url, max_retries=3, retry_delay=2):
 
     while retries <= max_retries:
         try:
-            if cap is None or not cap.isOpened(): #Verifica si cap está definida e inicializada.
+            if cap is None or not cap.isOpened():  #Verifica si cap esta definida e inicializada.
                 cap = cv2.VideoCapture(camera_url)
                 if not cap.isOpened():
-                    raise cv2.error("Could not open video stream")  #Lanza una excepción de opencv
+                    raise cv2.error("Could not open video stream") #Lanza una excepcion de opencv
 
             while True:
                 success, frame = cap.read()
                 if not success or frame is None:
                     raise cv2.error("Could not read frame")
 
-                frame = cv2.resize(frame, (640, 480))
+                frame = cv2.resize(frame, (640, 480))  # Resize *before* encoding
                 ret, buffer = cv2.imencode('.jpg', frame)
                 if not ret:
                     raise cv2.error("Could not encode frame to JPEG")
@@ -921,7 +921,7 @@ def gen_frames(camera_url, max_retries=3, retry_delay=2):
             print(f"Error de OpenCV: {e}")
             retries += 1
             if retries > max_retries:
-                print("Número máximo de intentos de conexión alcanzado.  Abortando.")
+                print("Número máximo de intentos de conexión alcanzado. Abortando.")
                 break  # Sale del bucle principal si se supera max_retries.
             print(f"Intentando reconectar en {retry_delay} segundos... (Intento {retries}/{max_retries})")
             time.sleep(retry_delay)
@@ -934,12 +934,10 @@ def gen_frames(camera_url, max_retries=3, retry_delay=2):
             print(f"Error inesperado: {e}")
             break
         finally:
-          if cap is not None:
-            cap.release()
+            if cap is not None:
+                cap.release()
 
 
-
-# views.py  (ONLY the modified and new functions)
 
 @login_required
 def calibrar_camara_paso3(request):
@@ -957,7 +955,7 @@ def calibrar_camara_paso3(request):
     if not ip_port:
         return redirect('calibrar_camara_paso1')
 
-    # Reconstruct full_url, using the *same logic* as paso1.  This is important!
+    # Reconstruct full_url, using the *same logic* as paso1. This is important!
     if username and password:
         # Remove any existing protocol://
         ip_port = re.sub(r"^(https?|rtsp)://", "", ip_port, flags=re.IGNORECASE)
@@ -965,19 +963,20 @@ def calibrar_camara_paso3(request):
     else:
         full_url = ip_port
         if not (full_url.lower().startswith("http://") or full_url.lower().startswith("https://") or full_url.lower().startswith("rtsp://")):
-            full_url = f"{protocol.lower()}://{full_url}" # Add protocol if missing
+            full_url = f"{protocol.lower()}://{full_url}"  # Add protocol if missing
 
+    # ArUco setup (only needed if using ArUco, but defining it here is cleaner)
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_50)
     aruco_params = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
-    marker_size = 0.15  # 15 cm
+    marker_size = 0.15  # 15 cm (adjust as needed)
+
 
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         action = request.POST.get('action')
         logger.info(f"Paso 3 - Acción: {action}, URL: {full_url}")  # Log the *full* URL
 
         if action == 'capture_near' or action == 'capture_far':
-            # ... (Rest of your Paso 3 capture logic, using full_url) ...  (No changes here)
             try:
                 cap = cv2.VideoCapture(full_url)
                 if not cap.isOpened():
@@ -1029,7 +1028,7 @@ def calibrar_camara_paso3(request):
                 camera_data = {
                     "ip_url": ip_port,  # Store the *original* ip_port
                     "label": camera_name,
-                    "px_m": pixels_per_meter,  # Use ArUco-calculated value
+                    "px_m": pixels_per_meter,
                     "status": "calibrated",
                     "uuid": camera_uuid,
                     "username": username,
@@ -1042,7 +1041,7 @@ def calibrar_camara_paso3(request):
                 create_log_entry(request, 'Calibrar Cámara', f'Finalizó calibración (ArUco) en cámara: {ip_port}')
                 return JsonResponse({'success': True, 'message': 'Calibración finalizada', 'pixels_per_meter': pixels_per_meter})
             else:
-                 return JsonResponse({'success': False, 'message': 'Se necesitan al menos 1 capturas para cada distancia'}) #MODIFIED
+                return JsonResponse({'success': False, 'message': 'Se necesitan al menos 1 capturas para cada distancia'}) #MODIFIED
 
 
         elif action == 'calculate_line':  # New action for line-based calculation
@@ -1069,10 +1068,10 @@ def calibrar_camara_paso3(request):
             pixel_distance = np.linalg.norm(p2 - p1)  # Euclidean distance
             pixels_per_meter = pixel_distance / line_length
 
-            request.session['pixels_per_meter'] = pixels_per_meter #Almacena en sesión
+            request.session['pixels_per_meter'] = pixels_per_meter  #Almacena en sesión
             # --- Store Camera Data ---
             camera_uuid, existing_camera_data = get_camera_by_ip(ip_port)
-            if camera_uuid: # Check for duplicate
+            if camera_uuid:  # Check for duplicate
                 return JsonResponse({'success': False, 'message': 'Ya existe una cámara con esta IP/URL.'})
 
             camera_uuid = str(uuid.uuid4())
@@ -1098,8 +1097,8 @@ def store_line_points(request):
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         try:
             data = json.loads(request.body)  # Correctly load JSON data
-            points = data.get('points')      # Access the 'points' key
-            if points and len(points) == 2:   # Validate the points
+            points = data.get('points')  # Access the 'points' key
+            if points and len(points) == 2:  # Validate the points
                 request.session['line_points'] = points
                 return JsonResponse({'success': True})
             else:
