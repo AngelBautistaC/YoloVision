@@ -857,25 +857,6 @@ def camera_stream(request):
 
 
 
-@login_required
-def calibrar_camara_paso_final(request):
-    # Verificar si se ha completado el paso 3
-    if not request.session.get('pixels_per_meter'):
-        return redirect('calibrar_camara_paso1')  # Redirect to step 1 if not completed
-
-    context = {
-        'step': 'final',
-        'camera_name': request.session.get('camera_name', ''),
-        'ambiente': request.session.get('ambiente', ''),
-        'piso': request.session.get('piso', ''),
-        'pixels_per_meter': request.session.get('pixels_per_meter', ''),
-    }
-    # Limpiar datos de calibración (IMPORTANT to prevent issues if recalibrating)
-    calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter','username','password','protocol', 'line_points']
-    for key in calibration_keys:
-        if key in request.session:
-            del request.session[key]
-    return render(request, 'calibrar_camara.html', context)
 
 
 def gen_frames(camera_url, max_retries=3, retry_delay=2):
@@ -942,7 +923,7 @@ def gen_frames(camera_url, max_retries=3, retry_delay=2):
 @login_required
 def calibrar_camara_paso3(request):
     context = {'step': '3'}
-    ip_port = request.session.get('ip_port')  # Get the *original* ip_port
+    ip_port = request.session.get('ip_port')
     camera_name = request.session.get('camera_name')
     ambiente = request.session.get('ambiente')
     piso = request.session.get('piso')
@@ -950,147 +931,155 @@ def calibrar_camara_paso3(request):
     password = request.session.get('password')
     protocol = request.session.get('protocol', 'http')
 
-    context['ip_port'] = ip_port  # Pass the original ip_port to the template
+    context['ip_port'] = ip_port
 
     if not ip_port:
         return redirect('calibrar_camara_paso1')
 
-    # Reconstruct full_url, using the *same logic* as paso1. This is important!
     if username and password:
-        # Remove any existing protocol://
         ip_port = re.sub(r"^(https?|rtsp)://", "", ip_port, flags=re.IGNORECASE)
         full_url = f"{protocol.lower()}://{username}:{password}@{ip_port}"
     else:
         full_url = ip_port
         if not (full_url.lower().startswith("http://") or full_url.lower().startswith("https://") or full_url.lower().startswith("rtsp://")):
-            full_url = f"{protocol.lower()}://{full_url}"  # Add protocol if missing
+            full_url = f"{protocol.lower()}://{full_url}"
 
-    # ArUco setup (only needed if using ArUco, but defining it here is cleaner)
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_50)
     aruco_params = cv2.aruco.DetectorParameters()
     detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
-    marker_size = 0.15  # 15 cm (adjust as needed)
-
+    marker_size = 0.15
 
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         action = request.POST.get('action')
-        logger.info(f"Paso 3 - Acción: {action}, URL: {full_url}")  # Log the *full* URL
+        logger.info(f"Paso 3 - Acción: {action}, URL: {full_url}")
 
         if action == 'capture_near' or action == 'capture_far':
             try:
                 cap = cv2.VideoCapture(full_url)
                 if not cap.isOpened():
-                    return JsonResponse({'success': False, 'message': 'No se pudo abrir el stream de la cámara.'})
-
+                    return JsonResponse({'success': False, 'message': 'No se pudo abrir el stream.'})
                 ret, frame = cap.read()
                 cap.release()
-
-                if not ret or frame is None:
+                if not ret:
                     return JsonResponse({'success': False, 'message': 'No se pudo capturar la imagen'})
 
-                # Redimensionar el frame a 640x480
                 frame = cv2.resize(frame, (640, 480))
                 corners, ids, _ = detector.detectMarkers(frame)
-                if ids is not None and len(ids) > 0:
+                if ids is not None:
                     marker_width_px = np.linalg.norm(corners[0][0][1] - corners[0][0][0])
                     pixels_per_meter = marker_width_px / marker_size
-
                     if action == 'capture_near':
                         request.session['pixels_per_meter_near'] = request.session.get('pixels_per_meter_near', []) + [pixels_per_meter]
                         captures = len(request.session['pixels_per_meter_near'])
                     else:
                         request.session['pixels_per_meter_far'] = request.session.get('pixels_per_meter_far', []) + [pixels_per_meter]
                         captures = len(request.session['pixels_per_meter_far'])
-
                     return JsonResponse({'success': True, 'captures': captures})
                 else:
-                    return JsonResponse({'success': False, 'message': 'No se detectó el marcador ArUco'})
-
+                    return JsonResponse({'success': False, 'message': 'Marcador ArUco no detectado'})
             except Exception as e:
-                logger.exception(f"Error al capturar: {str(e)}")
-                return JsonResponse({'success': False, 'message': f'Error al capturar: {str(e)}'})
+                logger.exception(f"Error al capturar: {e}")
+                return JsonResponse({'success': False, 'message': f'Error al capturar: {e}'})
 
-        elif action == 'calculate':  # Handles *both* ArUco and line calculation
-            # --- ArUco Calculation ---
+        elif action == 'calculate':  # Cálculo para ArUco
             pixels_per_meter_near = request.session.get('pixels_per_meter_near', [])
             pixels_per_meter_far = request.session.get('pixels_per_meter_far', [])
-
             if len(pixels_per_meter_near) >= 1 and len(pixels_per_meter_far) >= 1:
                 pixels_per_meter = np.mean(pixels_per_meter_near[:1] + pixels_per_meter_far[:1])
-                request.session['pixels_per_meter'] = pixels_per_meter  # Store for final step
-
-                # --- Store Camera Data (using ArUco result) ---
-                camera_uuid, existing_camera_data = get_camera_by_ip(ip_port)
-                if camera_uuid:  # Check for duplicate
-                    return JsonResponse({'success': False, 'message': 'Ya existe una cámara con esta IP/URL en la base de datos.'})
-
-                camera_uuid = str(uuid.uuid4())
-                camera_data = {
-                    "ip_url": ip_port,  # Store the *original* ip_port
-                    "label": camera_name,
-                    "px_m": pixels_per_meter,
-                    "status": "calibrated",
-                    "uuid": camera_uuid,
-                    "username": username,
-                    "password": password,
-                    "protocol": protocol,
-                    "full_url": full_url  # Include full_url
-                }
-
-                save_camera_data(ambiente, piso, camera_uuid, camera_data)
-                create_log_entry(request, 'Calibrar Cámara', f'Finalizó calibración (ArUco) en cámara: {ip_port}')
-                return JsonResponse({'success': True, 'message': 'Calibración finalizada', 'pixels_per_meter': pixels_per_meter})
+                request.session['pixels_per_meter'] = pixels_per_meter
+                return JsonResponse({'success': True, 'pixels_per_meter': pixels_per_meter})
             else:
-                return JsonResponse({'success': False, 'message': 'Se necesitan al menos 1 capturas para cada distancia'}) #MODIFIED
+                return JsonResponse({'success': False, 'message': 'Se necesitan capturas cerca/lejos'})
 
-
-        elif action == 'calculate_line':  # New action for line-based calculation
-            line_length_str = request.POST.get('line_length')  # Get line length as string
+        elif action == 'calculate_line':  # Cálculo para la línea
+            line_length_str = request.POST.get('line_length')
             line_points = request.session.get('line_points')
 
-            # --- Input Validation ---
             if not line_length_str:
-                return JsonResponse({'success': False, 'message': 'Debe ingresar la longitud de la línea.'})
+                return JsonResponse({'success': False, 'message': 'Ingrese la longitud.'})
             try:
-                line_length = float(line_length_str)  # Convert to float
+                line_length = float(line_length_str)
                 if line_length <= 0:
-                    raise ValueError("Length must be positive")
+                    raise ValueError()
             except ValueError:
-                return JsonResponse({'success': False, 'message': 'La longitud de la línea debe ser un número positivo.'})
-
+                return JsonResponse({'success': False, 'message': 'Longitud inválida.'})
             if not line_points or len(line_points) != 2:
-                return JsonResponse({'success': False, 'message': 'Debe dibujar una línea de dos puntos en la imagen.'})
+                return JsonResponse({'success': False, 'message': 'Dibuje una línea.'})
 
-
-            # Calculate pixels per meter
-            p1 = np.array(line_points[0])  # First point as numpy array
-            p2 = np.array(line_points[1])  # Second point as numpy array
-            pixel_distance = np.linalg.norm(p2 - p1)  # Euclidean distance
+            p1 = np.array(line_points[0])
+            p2 = np.array(line_points[1])
+            pixel_distance = np.linalg.norm(p2 - p1)
             pixels_per_meter = pixel_distance / line_length
-
-            request.session['pixels_per_meter'] = pixels_per_meter  #Almacena en sesión
-            # --- Store Camera Data ---
-            camera_uuid, existing_camera_data = get_camera_by_ip(ip_port)
-            if camera_uuid:  # Check for duplicate
-                return JsonResponse({'success': False, 'message': 'Ya existe una cámara con esta IP/URL.'})
-
-            camera_uuid = str(uuid.uuid4())
-            camera_data = {
-                "ip_url": ip_port,
-                "label": camera_name,
-                "px_m": pixels_per_meter,  # Use the calculated value
-                "status": "calibrated",
-                "uuid": camera_uuid,
-                "username": username,
-                "password": password,
-                "protocol": protocol,
-                "full_url": full_url
-            }
-            save_camera_data(ambiente, piso, camera_uuid, camera_data)
-            create_log_entry(request, 'Calibrar Cámara', f'Finalizó calibración (línea) en cámara: {ip_port}')
+            request.session['pixels_per_meter'] = pixels_per_meter
             return JsonResponse({'success': True, 'pixels_per_meter': pixels_per_meter})
 
     return render(request, 'calibrar_camara.html', context)
+
+
+
+@login_required
+def calibrar_camara_paso_final(request):
+    # Verificar si se ha completado el paso 3
+    pixels_per_meter = request.session.get('pixels_per_meter')
+    if not pixels_per_meter:
+        return redirect('calibrar_camara_paso1')
+
+    # --- Lógica de GUARDADO (ahora aquí) ---
+    ip_port = request.session.get('ip_port')
+    camera_name = request.session.get('camera_name')
+    ambiente = request.session.get('ambiente')
+    piso = request.session.get('piso')
+    username = request.session.get('username')
+    password = request.session.get('password')
+    protocol = request.session.get('protocol', 'http')
+
+    if username and password:
+        ip_port_no_protocol = re.sub(r"^(https?|rtsp)://", "", ip_port, flags=re.IGNORECASE)
+        full_url = f"{protocol.lower()}://{username}:{password}@{ip_port_no_protocol}"
+    else:
+        full_url = ip_port
+        if not (full_url.lower().startswith("http://") or full_url.lower().startswith("https://") or full_url.lower().startswith("rtsp://")):
+            full_url = f"{protocol.lower()}://{full_url}"
+
+    camera_uuid, existing_camera_data = get_camera_by_ip(ip_port)
+    if camera_uuid:  # Check for duplicate.  VERY IMPORTANT.
+        # Handle duplicate.  Perhaps show an error message, or redirect.
+        #  A good approach is to redirect to paso1 and display an error.
+        messages.error(request, 'Ya existe una cámara con esta IP/URL en la base de datos.')  # Requires django.contrib.messages
+        return redirect('calibrar_camara_paso1')
+
+    camera_uuid = str(uuid.uuid4())
+    camera_data = {
+        "ip_url": ip_port,  # Store the *original* ip_port
+        "label": camera_name,
+        "px_m": pixels_per_meter,  # Now, this comes from the session
+        "status": "calibrated",
+        "uuid": camera_uuid,
+        "username": username,
+        "password": password,
+        "protocol": protocol,
+        "full_url": full_url  # Include full_url
+    }
+    save_camera_data(ambiente, piso, camera_uuid, camera_data)
+    create_log_entry(request, 'Calibrar Cámara', f'Finalizó calibración en cámara: {ip_port}')
+    # --- Fin de la lógica de guardado ---
+
+    context = {
+        'step': 'final',
+        'camera_name': camera_name,
+        'ambiente': ambiente,
+        'piso': piso,
+        'pixels_per_meter': pixels_per_meter,
+    }
+
+    # Limpiar datos de calibración
+    calibration_keys = ['ip_port', 'camera_name', 'ambiente', 'piso', 'objpoints', 'imgpoints', 'pixels_per_meter_near', 'pixels_per_meter_far', 'pixels_per_meter','username','password','protocol', 'line_points']
+    for key in calibration_keys:
+        if key in request.session:
+            del request.session[key]
+
+    return render(request, 'calibrar_camara.html', context)
+
 
 def store_line_points(request):
     """Stores the line points in the session."""
@@ -1132,37 +1121,6 @@ def capture_frame(ip_port):
     except Exception as e:
         print(f"Error capturing frame: {str(e)}")
         return None
-
-# #/////////////////////////////////////////////////////////////////////////////////////////////////////
-# def update_camera_data(ambiente, piso, camera_data):
-#     data = load_json_data()
-#     for amb in data["ambientes"]:
-#         if amb["nombreAmbiente"] == ambiente:
-#             if piso not in amb["piso"]:
-#                 amb["piso"][piso] = {}
-#             if "camara" not in amb["piso"][piso]:
-#                 amb["piso"][piso]["camara"] = []
-            
-#             for cam in amb["piso"][piso]["camara"]:
-#                 if cam["ip_url"] == camera_data["ip_url"]:
-#                     cam.update(camera_data)
-#                     break
-#             else:
-#                 amb["piso"][piso]["camara"].append(camera_data)
-#             break
-#     else:
-#         new_ambiente = {
-#             "nombreAmbiente": ambiente,
-#             "piso": {
-#                 piso: {
-#                     "camara": [camera_data]
-#                 }
-#             }
-#         }
-#         data["ambientes"].append(new_ambiente)
-#     save_json_data(data)
-
-# #/////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 def supervisar_camara(request, camera_uuid):

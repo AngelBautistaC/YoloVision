@@ -363,58 +363,70 @@
         
         
                 // --- EVENT LISTENER PARA EL CLIC (MODIFICADO) ---
-                lineCanvas.addEventListener('click', function(e) {
-                    if (!isDrawingLine) return;
-        
-                    const rect = lineCanvas.getBoundingClientRect();
-        
-                    // --- CÁLCULO DEL FACTOR DE ESCALA (AQUÍ ESTÁ LA CLAVE) ---
-                    const scaleX = originalWidth / rect.width;
-                    const scaleY = originalHeight / rect.height;
-        
-                    // --- AHORA USA LOS FACTORES DE ESCALA PARA AJUSTAR LAS COORDENADAS ---
-                    const x = (e.clientX - rect.left) * scaleX;
-                    const y = (e.clientY - rect.top) * scaleY;
-        
-                    linePoints.push([x, y]);
-                    drawLine();
-        
-                    if (linePoints.length === 2) {
-                        isDrawingLine = false;
-                        calculateBtn.disabled = false;
-                        console.log("Line drawing complete. Points:", linePoints);
-        
-                        // Store points in session (AJAX)
-                        fetch('{% url "store_line_points" %}', {
-                            method: 'POST',
-                            headers: {
-                                'X-Requested-With': 'XMLHttpRequest',
-                                'X-CSRFToken': '{{ csrf_token }}',
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ points: linePoints })
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            console.log("store_line_points response:", data);
-                            if (!data.success) {
-                                alert("Error al guardar puntos: " + data.message);
-                            }
-                        });
-                    }
-                });
-        
-                startDrawingBtn.addEventListener('click', function() {
-                    console.log("startDrawingBtn clicked");
-                    isDrawingLine = true;
-                    linePoints = []; // Reset points
-                    lineCtx.clearRect(0, 0, lineCanvas.width, lineCanvas.height); // Clear canvas
-                    calculateBtn.disabled = true; // Disable until line is drawn
-                    alert('Haga clic en dos puntos en la imagen para dibujar la línea.');
-                });
+// --- Dentro del evento click del canvas (AHORA CON REDIBUJADO) ---
+lineCanvas.addEventListener('click', function(e) {
+    if (!isDrawingLine) return;
+
+    const rect = lineCanvas.getBoundingClientRect();
+
+    // --- CÁLCULO DEL FACTOR DE ESCALA ---
+    const scaleX = originalWidth / rect.width;
+    const scaleY = originalHeight / rect.height;
+
+    // --- AJUSTE DE COORDENADAS ---
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    linePoints.push([x, y]);
+    drawLine(); // Dibuja INMEDIATAMENTE después de agregar un punto.
+
+    if (linePoints.length === 2) {
+        isDrawingLine = false;
+        calculateBtn.disabled = false;
+        console.log("Line drawing complete. Points:", linePoints);
+
+        // Store points in session (AJAX) -  (sin cambios aquí)
+        fetch('{% url "store_line_points" %}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ points: linePoints })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("store_line_points response:", data);
+            if (!data.success) {
+                alert("Error al guardar puntos: " + data.message);
+            }
+        });
+    }
+});
+
+
+
+
+
+
+            startDrawingBtn.addEventListener('click', function(event) {
+                event.stopPropagation(); // Añadido
+                console.log("startDrawingBtn clicked");
+                isDrawingLine = true;
+                linePoints = []; // Reset points
+                lineCtx.clearRect(0, 0, lineCanvas.width, lineCanvas.height); // Clear canvas
+                calculateBtn.disabled = true; // Disable until line is drawn
+                alert('Haga clic en dos puntos en la imagen para dibujar la línea.');
+            });
         
                 // --- Calculate Button Logic (Modified) ---
-                calculateBtn.addEventListener('click', function() {
+                calculateBtn.addEventListener('click', function(event) { // Añade event
+                    event.stopPropagation(); // Detiene la propagación.  ¡MUY IMPORTANTE!
+                    if(finishBtn.style.display !== 'none'){
+                            return;
+                        }
+                    
                      // Determine which method is selected and build the request accordingly
                     let requestData = new URLSearchParams();
         
@@ -456,13 +468,16 @@
                     });
                 });
         
-        
-                // --- FUNCIÓN resizeCanvas (MODIFICADA, más simple) ---
+                        
+                // --- FUNCIÓN resizeCanvas (AHORA CON CONDICIONAL) ---
                 function resizeCanvas() {
                     console.log("resizeCanvas called");
-                    lineCanvas.width = videoStream.clientWidth;  // Ajusta al tamaño del <img>
+                    lineCanvas.width = videoStream.clientWidth;
                     lineCanvas.height = videoStream.clientHeight;
-                    drawLine(); // Redibuja si es necesario
+                    // SOLO redibuja si hay una línea completa.
+                    if (linePoints.length === 2) {
+                        drawLine();
+                    }
                 }
         
                 // --- Usa 'loadedmetadata' (más preciso que 'load') ---
@@ -503,9 +518,16 @@
                     });
                 }
         
-                captureNearBtn.addEventListener('click', () => captureImage(true));
-                captureFarBtn.addEventListener('click', () => captureImage(false));
-        
+                captureNearBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    captureImage(true)
+                });
+
+                captureFarBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    captureImage(false)
+                });
+                        
                 finishBtn.addEventListener('click', function() {
                     window.location.href = '{% url "calibrar_camara_paso_final" %}';
                 });
