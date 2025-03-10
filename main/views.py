@@ -620,7 +620,7 @@ def actualizar_campo_poligono(request):
                     print(f"Error: Campo desconocido: {field}") # LOG
                     return JsonResponse({'success': False, 'error': 'Campo desconocido'})
 
-                request.session.modified = True  # ¡MUY IMPORTANTE!
+                request.session.modified = True  
                 # No es necesario actualizar las listas aquí; ya se modificó el objeto 'polygon' directamente
                 print("Sesión modificada.") # LOG
                 return JsonResponse({'success': True})
