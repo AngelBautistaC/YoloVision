@@ -229,11 +229,32 @@ def crear_form_view(request):
 
 
 
+import cv2
+import numpy as np
+from ultralytics import YOLO
+import json
+from django.http import JsonResponse, StreamingHttpResponse
+from django.shortcuts import render
+from django.views.decorators.http import require_POST
+import uuid
+import math
+import colorsys  # Importante: Añadimos colorsys
+from firebase_admin import db
+
+# Funciones auxiliares (get_camera_by_ip, create_log_entry) - Asumo que están definidas en otro lugar
 
 #-----------------------------------------FLUJO CONFIGURACION DE CAMARAS-------------------------------------------------------
 
-def generate_random_color():
-    return tuple(np.random.randint(0, 255, 3).tolist())
+def generate_distinct_color():
+    """Genera un color RGB aleatorio y distintivo."""
+    # Usamos el espacio de color HSV para controlar mejor la distinción
+    h = np.random.rand()  # Tono aleatorio (0-1)
+    s = 0.8 + 0.2 * np.random.rand()  # Saturación alta (0.8-1.0)
+    v = 0.8 + 0.2 * np.random.rand()  # Valor alto (0.8-1.0)
+
+    # Convertir HSV a RGB
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+    return (int(r * 255), int(g * 255), int(b * 255))  # Convertir a enteros de 0-255
 
 
 def simplify_polygon(polygon, target_points=6):
@@ -386,8 +407,6 @@ def stream_video(request):
     return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
 
 
-def generate_random_color():
-    return tuple(np.random.randint(0, 255, 3).tolist())
 
 
 def obtener_info_mesas(request):
@@ -469,7 +488,7 @@ def detectar_mesas(request):
                             perimeter_meters = perimeter_pixels / pixels_per_meter
                             personas = math.floor(perimeter_meters / 1.15)
                             # Asignar color único aquí
-                            color = generate_random_color()
+                            color = generate_distinct_color()
 
                             detected_polygons.append({
                                 'id': str(uuid.uuid4()),
@@ -510,7 +529,7 @@ def agregar_poligono(request):
 
 
         # Generar color único aquí
-        color = generate_random_color()
+        color = generate_distinct_color()
 
         new_polygon = {
             'id': str(uuid.uuid4()),
@@ -620,7 +639,7 @@ def actualizar_campo_poligono(request):
                     print(f"Error: Campo desconocido: {field}") # LOG
                     return JsonResponse({'success': False, 'error': 'Campo desconocido'})
 
-                request.session.modified = True  
+                request.session.modified = True
                 # No es necesario actualizar las listas aquí; ya se modificó el objeto 'polygon' directamente
                 print("Sesión modificada.") # LOG
                 return JsonResponse({'success': True})
@@ -649,7 +668,7 @@ def etiquetar_poligono(request):
             return JsonResponse({'success': True})
 
         return JsonResponse({'error': 'Polígono no encontrado'})
-    
+
     return JsonResponse({'error': 'Método no permitido'})
 
 def quitar_poligono(request):
@@ -690,7 +709,7 @@ def iniciar_tracking(request):
 
             updated_data = current_data.copy()  # Copiar los datos actuales
 
-            # Preparar los datos de las mesas para Firebase (sin 'color')
+            # Preparar los datos de las mesas para Firebase (AHORA CON 'color')
             mesas_data = []
             for polygon in polygons:
                 mesa_data = {
@@ -700,7 +719,8 @@ def iniciar_tracking(request):
                     'type': polygon['type'],
                     'area': polygon['area'],
                     'perimeter': polygon['perimeter'],
-                    'max_personas': polygon['max_personas']
+                    'max_personas': polygon['max_personas'],
+                    'color': polygon['color']  # <-- Agregar el color
                 }
                 mesas_data.append(mesa_data)
             updated_data['mesas'] = mesas_data
@@ -719,8 +739,6 @@ def iniciar_tracking(request):
 
 
 #-----------------------------------------FLUJO CONFIGURACION DE CAMARAS - EOF-------------------------------------------------------
-
-
 
 
 
