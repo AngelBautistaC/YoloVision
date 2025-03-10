@@ -7,11 +7,31 @@ from firebase_admin import db
 from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
 from ultralytics import YOLO
 import cv2
+import re  # Importar el módulo re
 from django.http import HttpRequest
 from logger.utils import create_log_entry, create_celery_log_entry
 
-def test_camera_connection(ip_url):
-    cap = cv2.VideoCapture(ip_url)
+
+
+def construct_full_url(ip_url, username=None, password=None, protocol="http"):
+    """Construye la URL completa para la cámara, incluyendo credenciales y protocolo."""
+    if username and password:
+        ip_url_no_protocol = re.sub(r"^(https?|rtsp)://", "", ip_url, flags=re.IGNORECASE)
+        full_url = f"{protocol.lower()}://{username}:{password}@{ip_url_no_protocol}"
+    else:
+        full_url = ip_url
+        if not (full_url.lower().startswith("http://") or full_url.lower().startswith("https://") or full_url.lower().startswith("rtsp://")):
+            full_url = f"{protocol.lower()}://{full_url}"
+    return full_url
+
+
+
+def test_camera_connection(ip_url, username=None, password=None, protocol="http"):
+    """
+    Prueba la conexión de la cámara, manejando URLs con y sin credenciales y diferentes protocolos.
+    """
+    full_url = construct_full_url(ip_url, username, password, protocol)
+    cap = cv2.VideoCapture(full_url)
     start = time.time()
     success = False
     while time.time() - start < 5:
@@ -22,6 +42,7 @@ def test_camera_connection(ip_url):
         time.sleep(0.5)
     cap.release()
     return success
+
 
 @shared_task
 def run_detection_for_configured_cameras():
@@ -37,23 +58,23 @@ def run_detection_for_configured_cameras():
             camaras = (piso_data.get('camara', {}) or {})
             for cam_uuid, cam_data in camaras.items():
                 if cam_data.get('status') == 'configurated':
-                    # Solo detectar si stable
                     if cam_data.get('connection_state', 'stable') == 'stable':
                         detection_interval = cam_data.get('detection_interval', 5)
                         last_detection_time = cam_data.get('last_detection_time', 0)
-                        # Verificamos si ya pasó el intervalo
                         if current_time - last_detection_time < detection_interval:
-                            # Aún no es tiempo de detectar esta cam
                             continue
-                        
+
                         ip_url = cam_data['ip_url']
+                        username = cam_data.get('username')  # Obtener usuario
+                        password = cam_data.get('password')  # Obtener contraseña
+                        protocol = cam_data.get('protocol', 'http')  # Obtener protocolo
+                        full_url = construct_full_url(ip_url, username, password, protocol) # Usar la función
+
                         pixels_per_meter = cam_data['px_m']
                         polygons = cam_data.get('mesas', [])
 
-                        # Intentar leer un frame
-                        cap = cv2.VideoCapture(ip_url)
+                        cap = cv2.VideoCapture(full_url)  # Usar full_url
                         if not cap.isOpened():
-                            # No se pudo abrir el stream
                             continue
                         ret, frame = cap.read()
                         cap.release()
@@ -63,14 +84,12 @@ def run_detection_for_configured_cameras():
                         frame = cv2.resize(frame, (640, 480))
                         model = YOLO('yolo11s.pt')
 
-                        # Preparar tracking_data
                         tracking_data_list = []
                         for polygon in polygons:
                             expanded_polygon = expand_polygon(polygon['points'], 0, pixels_per_meter)
                             track_history = initialize_tracking()
                             counting_regions = initialize_counting_regions(expanded_polygon, polygon['max_personas'])
-                            # Solo un frame, no trackeo en historico, pero se puede mantener track_history
-                            # para el siguiente ciclo si se guarda en Firebase (opcional)
+
                             frame2 = frame.copy()
                             frame2 = track_and_count(frame2, model, track_history, counting_regions)
                             personas_detectadas = counting_regions[0]['counts']
@@ -80,10 +99,10 @@ def run_detection_for_configured_cameras():
                                 'polygon': polygon
                             })
 
-                        # Guardar resultados
                         cam_data['mesas'] = [td['polygon'] for td in tracking_data_list]
                         cam_data['last_detection_time'] = current_time
                         save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
+
 
 
 @shared_task
@@ -93,6 +112,11 @@ def start_detection_task(camera_uuid):
         return
 
     ip_url = camera_data['ip_url']
+    username = camera_data.get('username')  # Obtener usuario
+    password = camera_data.get('password')  # Obtener contraseña
+    protocol = camera_data.get('protocol', 'http')  # Obtener protocolo
+    full_url = construct_full_url(ip_url, username, password, protocol)  # Usar la función
+
     pixels_per_meter = camera_data['px_m']
     detection_interval = camera_data.get('detection_interval', 5)
     polygons = camera_data.get('mesas', [])
@@ -113,11 +137,11 @@ def start_detection_task(camera_uuid):
         })
 
     while True:
-        if not test_camera_connection(ip_url):
+        if not test_camera_connection(ip_url, username, password, protocol):  # Pasar credenciales y protocolo
             time.sleep(detection_interval)
             continue
 
-        cap = cv2.VideoCapture(ip_url)
+        cap = cv2.VideoCapture(full_url)  # Usar full_url
         if not cap.isOpened():
             time.sleep(detection_interval)
             continue
@@ -158,15 +182,19 @@ def check_connection_task():
                     connection_attempts = cam_data.get('connection_attempts', 0)
                     ip_url = cam_data.get('ip_url')
                     cam_label = cam_data.get('label', 'N/A')
+                    username = cam_data.get('username')  # Obtener usuario
+                    password = cam_data.get('password')  # Obtener contraseña
+                    protocol = cam_data.get('protocol', 'http')  # Obtener protocolo
+
 
                     if connection_state == 'stable':
-                        if not test_camera_connection(ip_url):
+                        if not test_camera_connection(ip_url, username, password, protocol):  # Pasar credenciales y protocolo
                             cam_data['connection_state'] = 'reconnecting'
                             cam_data['connection_attempts'] = 1
                             save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
                             create_celery_log_entry('Problema de conexión', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} pasó a estado \'reconectando\' tras un intento fallido de conexión .')
                     elif connection_state == 'reconnecting':
-                        if not test_camera_connection(ip_url):
+                        if not test_camera_connection(ip_url, username, password, protocol):  # Pasar credenciales y protocolo
                             connection_attempts += 1
                             cam_data['connection_attempts'] = connection_attempts
                             if connection_attempts >= 5:
@@ -179,10 +207,10 @@ def check_connection_task():
                             save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
                             create_celery_log_entry('Conexión recuperada', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} recuperó conexión después de {connection_attempts} minutos.')
                     elif connection_state == 'failed':
-                        connection_attempts += 1
+                        connection_attempts +=1
                         cam_data['connection_attempts'] = connection_attempts
-                        if test_camera_connection(ip_url):
+                        if test_camera_connection(ip_url, username, password, protocol):  # Pasar credenciales y protocolo
                             cam_data['connection_state'] = 'stable'
                             cam_data['connection_attempts'] = 0
                             create_celery_log_entry('Conexión recuperada', f'Cámara {cam_label} (UUID: {cam_uuid}, IP: {ip_url}) en {ambiente_nombre}/{piso_nombre} recuperó conexión después de {connection_attempts} minutos.')
-                        save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
+                            save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)

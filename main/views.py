@@ -1123,9 +1123,23 @@ def capture_frame(ip_port):
         return None
 
 
+#-----------------------------------------FLUJO SUPERVISAR CAMARA-------------------------------------------------------
+
+def construct_full_url(ip_url, username=None, password=None, protocol="http"):
+    """Construye la URL completa, manejando credenciales y protocolo."""
+    if username and password:
+        ip_url_no_protocol = re.sub(r"^(https?|rtsp)://", "", ip_url, flags=re.IGNORECASE)
+        full_url = f"{protocol.lower()}://{username}:{password}@{ip_url_no_protocol}"
+    else:
+        full_url = ip_url
+        if not (full_url.lower().startswith("http://") or full_url.lower().startswith("https://") or full_url.lower().startswith("rtsp://")):
+            full_url = f"{protocol.lower()}://{full_url}"
+    return full_url
+
+
 def supervisar_camara(request, camera_uuid):
     logger.info(f"Buscando cámara con UUID: {camera_uuid}")
-    
+
     camera_data = get_camera_by_uuid(camera_uuid)
     if not camera_data:
         logger.error(f"Cámara con UUID {camera_uuid} no encontrada")
@@ -1147,17 +1161,26 @@ def stream_supervisar_camara(request, camera_uuid):
         return HttpResponse("Cámara no encontrada", status=404)
 
     ip_url = camera_data['ip_url']
+    username = camera_data.get('username')  # Obtener username
+    password = camera_data.get('password')  # Obtener password
+    protocol = camera_data.get('protocol', 'http')  # Obtener protocolo y valor por defecto
+    full_url = construct_full_url(ip_url, username, password, protocol)  # Construir la URL completa
+
     polygons = camera_data.get('mesas', [])
 
     def generate_frames():
-        cap = cv2.VideoCapture(ip_url)
+        cap = cv2.VideoCapture(full_url)  # Usar la URL completa
+        if not cap.isOpened():
+           logger.error(f"No se pudo abrir la cámara con URL: {full_url}") # Intenta abrir y loggea el error
         while True:
             success, frame = cap.read()
             if not success:
-                # Retry connection
+                # Retry connection.  MUY IMPORTANTE: Incluir manejo de excepciones
                 cap.release()
                 time.sleep(5)
-                cap = cv2.VideoCapture(ip_url)
+                cap = cv2.VideoCapture(full_url) # Usar la URL completa
+                if not cap.isOpened():
+                   logger.error(f"No se pudo abrir la cámara con URL en el reintento: {full_url}") #Loggea error de reintento
                 continue
 
             frame = cv2.resize(frame, (640, 480))
@@ -1167,7 +1190,7 @@ def stream_supervisar_camara(request, camera_uuid):
                 points = np.array(polygon['points'], dtype=np.int32)
 
                 # Ensure color is a tuple of integers
-                color_data = polygon['color']
+                color_data = polygon.get('color') # Usar .get() aquí también
                 if isinstance(color_data, list):
                     color = tuple(map(int, color_data))
                 elif isinstance(color_data, str):
@@ -1197,7 +1220,7 @@ def stream_supervisar_camara(request, camera_uuid):
         cap.release()
 
     return StreamingHttpResponse(generate_frames(), content_type='multipart/x-mixed-replace; boundary=frame')
-
+#-----------------------------------------FLUJO SUPERVISAR CAMARA-------------------------------------------------------
 
 def obtener_info_mesas_uuid(request, camera_uuid):
     camera_data = get_camera_by_uuid(camera_uuid)
