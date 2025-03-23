@@ -15,12 +15,10 @@ from ultralytics import YOLO
 import base64
 import math
 from .firebase_helpers import delete_camera_from_firebase,get_camera_by_ip, save_camera_data,get_camera_by_uuid,save_camera_data2,get_ambientes_and_pisos_from_db
-# from .tasks import start_detection_task
-# from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from .forms import CreateUserForm
-from .firebase_helpers import create_user_in_firebase  # Function to handle Firebase user creation
+from .firebase_helpers import create_user_in_firebase  
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from .forms import LoginForm
@@ -49,8 +47,7 @@ from collections import defaultdict
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from firebase_admin import db
-
-
+import colorsys  # Importante: Añadimos colorsys
 
 
 
@@ -76,14 +73,6 @@ def role_required(allowed_roles=[]):
 
 def access_denied(request):
     return render(request, 'access_denied.html')
-
-
-
-
-
-
-
-
 
 
 
@@ -227,21 +216,6 @@ def crear_form_view(request):
 
 
 
-
-
-import cv2
-import numpy as np
-from ultralytics import YOLO
-import json
-from django.http import JsonResponse, StreamingHttpResponse
-from django.shortcuts import render
-from django.views.decorators.http import require_POST
-import uuid
-import math
-import colorsys  # Importante: Añadimos colorsys
-from firebase_admin import db
-
-# Funciones auxiliares (get_camera_by_ip, create_log_entry) - Asumo que están definidas en otro lugar
 
 #-----------------------------------------FLUJO CONFIGURACION DE CAMARAS-------------------------------------------------------
 
