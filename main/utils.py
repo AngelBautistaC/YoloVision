@@ -4,6 +4,11 @@ import numpy as np
 import math
 from shapely.geometry import Polygon, Point
 import collections
+from pymongo import MongoClient
+from django.conf import settings
+from datetime import datetime
+
+
 
 def expand_polygon(points, distance_meters, pixels_per_meter):
     distance_pixels = distance_meters * pixels_per_meter
@@ -67,3 +72,26 @@ def track_and_count(frame, model, track_history, counting_regions):
         cv2.polylines(frame, [polygon_coords], isClosed=True, color=region_color, thickness=2)
 
     return frame
+
+# -------- MongoDB Histórico de Detecciones -------- #
+from pymongo import MongoClient
+from django.conf import settings
+from datetime import datetime
+from firebase_admin import db
+
+def obtener_coleccion_historico():
+    cliente = MongoClient(settings.DATABASES['default']['CLIENT']['host'])
+    db = cliente['logs_db']
+    return db['historico_detecciones']
+
+def guardar_historico(camera_uuid, detections, ambiente, piso):
+    historico_detecciones = obtener_coleccion_historico()
+    documento = {
+        "camera_uuid": camera_uuid,
+        "ambiente": ambiente,  # nuevo campo
+        "piso": piso,          # nuevo campo
+        "timestamp": datetime.utcnow(),
+        "detections": detections
+    }
+    historico_detecciones.insert_one(documento)
+

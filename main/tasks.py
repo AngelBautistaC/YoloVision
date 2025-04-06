@@ -4,7 +4,7 @@ from celery import shared_task
 from .firebase_helpers import get_camera_by_uuid, save_camera_data
 import time
 from firebase_admin import db
-from .utils import expand_polygon, initialize_tracking, initialize_counting_regions, track_and_count
+from .utils import expand_polygon, guardar_historico, initialize_tracking, initialize_counting_regions, track_and_count
 from ultralytics import YOLO
 import cv2
 import re  # Importar el módulo re
@@ -65,15 +65,15 @@ def run_detection_for_configured_cameras():
                             continue
 
                         ip_url = cam_data['ip_url']
-                        username = cam_data.get('username')  # Obtener usuario
-                        password = cam_data.get('password')  # Obtener contraseña
-                        protocol = cam_data.get('protocol', 'http')  # Obtener protocolo
-                        full_url = construct_full_url(ip_url, username, password, protocol) # Usar la función
+                        username = cam_data.get('username')
+                        password = cam_data.get('password')
+                        protocol = cam_data.get('protocol', 'http')
+                        full_url = construct_full_url(ip_url, username, password, protocol)
 
                         pixels_per_meter = cam_data['px_m']
                         polygons = cam_data.get('mesas', [])
 
-                        cap = cv2.VideoCapture(full_url)  # Usar full_url
+                        cap = cv2.VideoCapture(full_url)
                         if not cap.isOpened():
                             continue
                         ret, frame = cap.read()
@@ -84,7 +84,8 @@ def run_detection_for_configured_cameras():
                         frame = cv2.resize(frame, (640, 480))
                         model = YOLO('yolo11s.pt')
 
-                        tracking_data_list = []
+                        detections_for_historic = []
+
                         for polygon in polygons:
                             expanded_polygon = expand_polygon(polygon['points'], 0, pixels_per_meter)
                             track_history = initialize_tracking()
@@ -95,13 +96,26 @@ def run_detection_for_configured_cameras():
                             personas_detectadas = counting_regions[0]['counts']
                             polygon['personas_Detectadas'] = personas_detectadas
                             counting_regions[0]['counts'] = 0
-                            tracking_data_list.append({
-                                'polygon': polygon
+
+                            detections_for_historic.append({
+                                'id': polygon.get('id', ''),
+                                'label': polygon.get('label', ''),
+                                'personas_detectadas': personas_detectadas,
+                                'max_personas': polygon.get('max_personas', 0),
+                                'area': polygon.get('area', 0),
+                                'perimeter': polygon.get('perimeter', 0),
+                                'points': polygon.get('points', []),
+                                'color': polygon.get('color', [0, 255, 0])
                             })
 
-                        cam_data['mesas'] = [td['polygon'] for td in tracking_data_list]
+                        cam_data['mesas'] = polygons
                         cam_data['last_detection_time'] = current_time
                         save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
+
+                        # Aquí guardamos el histórico en MongoDB
+                        guardar_historico(cam_uuid, detections_for_historic, ambiente_nombre, piso_nombre)
+
+
 
 
 
