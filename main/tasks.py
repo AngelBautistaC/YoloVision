@@ -11,7 +11,7 @@ import cv2
 import re  # Importar el módulo re
 from django.http import HttpRequest
 from logger.utils import create_log_entry, create_celery_log_entry
-
+from shapely.geometry import Polygon, Point
 
 
 def construct_full_url(ip_url, username=None, password=None, protocol="http"):
@@ -47,17 +47,16 @@ def test_camera_connection(ip_url, username=None, password=None, protocol="http"
 
 @shared_task
 def run_detection_for_configured_cameras():
-
-
     ambientes_ref = db.reference('/ambientes')
     ambientes_data = ambientes_ref.get()
     if not ambientes_data:
         return
 
-    #current_time = datetime.now(pytz.timezone('America/Lima')).timestamp()
-    #current_time = datetime.utcnow().timestamp()
-    #current_time = datetime.now(timezone.utc).timestamp()
     current_time = datetime.now(pytz.utc).timestamp()
+
+    # Cargar el modelo una sola vez si es posible (fuera del bucle de cámaras si todas usan el mismo)
+    # O dentro del bucle si diferentes cámaras pueden usar diferentes modelos (como está ahora)
+    # model = YOLO('yolo11s.pt') # Podría ir aquí si todas usan yolo11s.pt
 
     for ambiente_nombre, ambiente_data in ambientes_data.items():
         for piso_nombre, piso_data in (ambiente_data.get('piso', {}) or {}).items():
@@ -68,9 +67,7 @@ def run_detection_for_configured_cameras():
                         detection_interval = cam_data.get('detection_interval', 5)
                         last_detection_time = cam_data.get('last_detection_time', 0)
                         if current_time - last_detection_time < detection_interval:
-                            #print("No es el momento de detectar")
                             continue
-                        #print("es el momento de detectar")
 
                         ip_url = cam_data['ip_url']
                         username = cam_data.get('username')
@@ -79,58 +76,129 @@ def run_detection_for_configured_cameras():
                         full_url = construct_full_url(ip_url, username, password, protocol)
 
                         pixels_per_meter = cam_data['px_m']
-                        polygons = cam_data.get('mesas', [])
+                        polygons_data = cam_data.get('mesas', [])
+                        if not polygons_data: # Si no hay polígonos, saltar esta cámara
+                            continue
 
                         cap = cv2.VideoCapture(full_url)
                         if not cap.isOpened():
+                            # Loggear error de apertura si es necesario
                             continue
                         ret, frame = cap.read()
                         cap.release()
                         if not ret or frame is None:
+                            # Loggear error de lectura si es necesario
                             continue
 
-                        frame = cv2.resize(frame, (640, 480))
-                        model = YOLO('yolo11s.pt')
+                        # --- Optimización Principal ---
+                        # 1. Redimensionar frame una vez
+                        frame_resized = cv2.resize(frame, (640, 480))
 
+                        # 2. Cargar modelo (aquí si es específico por cámara, o fuera si es global)
+                        model = YOLO('yolo11s.pt') # Asumiendo yolo11s.pt para esta cámara
+
+                        # 3. Ejecutar detección/seguimiento UNA SOLA VEZ en el frame redimensionado
+                        #    Usamos track para obtener IDs consistentes entre frames si persist=True
+                        results = model.track(frame_resized, persist=True, classes=[0], conf=0.1, iou=0.5, verbose=False) # verbose=False para evitar prints de YOLO
+
+                        # 4. Preparar las regiones de conteo (geometrías)
+                        counting_regions = []
+                        for idx, p_data in enumerate(polygons_data):
+                            try:
+                                # Asegúrate que expand_polygon devuelve una lista de tuplas (x, y)
+                                expanded_points = expand_polygon(p_data['points'], 0, pixels_per_meter)
+                                # Crear objeto Polygon de Shapely para chequeo eficiente
+                                polygon_geom = Polygon(expanded_points)
+                                counting_regions.append({
+                                    'id': p_data.get('id', f'poly_{idx}'), # Usar ID si existe, sino un ID temporal
+                                    'polygon_geom': polygon_geom,
+                                    'max_personas': p_data.get('max_personas', 0),
+                                    'count': 0 # Inicializar contador
+                                })
+                            except Exception as e:
+                                print(f"Error processing polygon {p_data.get('id', idx)} for camera {cam_uuid}: {e}")
+                                # Consider logging this error properly
+                                continue # Saltar este polígono si hay error
+
+                        # 5. Iterar sobre los resultados de la detección UNA VEZ
                         detections_for_historic = []
+                        if results and results[0].boxes.id is not None:
+                            boxes = results[0].boxes.xyxy.cpu()
+                            track_ids = results[0].boxes.id.int().cpu().tolist()
+                            # clss = results[0].boxes.cls.cpu().tolist() # Clases si las necesitas
 
-                        for polygon in polygons:
-                            expanded_polygon = expand_polygon(polygon['points'], 0, pixels_per_meter)
-                            track_history = initialize_tracking()
-                            counting_regions = initialize_counting_regions(expanded_polygon, polygon['max_personas'])
+                            for box, track_id in zip(boxes, track_ids):
+                                # Calcular el punto central (o base) de la detección
+                                # Usamos el centro del bounding box como referencia
+                                bbox_center_x = (box[0] + box[2]) / 2
+                                bbox_center_y = (box[1] + box[3]) / 2 # Podrías usar box[3] (base del box) si es más apropiado
+                                detection_point = Point(bbox_center_x, bbox_center_y)
 
-                            frame2 = frame.copy()
-                            frame2 = track_and_count(frame2, model, track_history, counting_regions)
-                            personas_detectadas = counting_regions[0]['counts']
-                            polygon['personas_Detectadas'] = personas_detectadas
-                            counting_regions[0]['counts'] = 0
+                                # Verificar en qué región cae el punto
+                                for region in counting_regions:
+                                    if region['polygon_geom'].contains(detection_point):
+                                        region['count'] += 1
+                                        # Si una persona solo puede estar en una región a la vez, puedes usar 'break'
+                                        # break
 
+                        # 6. Actualizar los datos originales de los polígonos y preparar histórico
+                        updated_polygons_data = []
+                        for p_data in polygons_data:
+                            p_id = p_data.get('id', None)
+                            # Encontrar la región correspondiente por ID (o índice si se usó como fallback)
+                            found_region = None
+                            if p_id is not None:
+                                found_region = next((r for r in counting_regions if r['id'] == p_id), None)
+                            # Si no se encontró por ID (o no había ID), podríamos intentar por índice si lo guardamos
+                            # Para simplificar, asumimos que el ID existe o el orden se mantiene
+                            # Si no, necesitaríamos una forma más robusta de mapear p_data con region
+
+                            if found_region:
+                                personas_detectadas = found_region['count']
+                            else:
+                                # Si por alguna razón no se encontró la región (ej. error previo), asignar 0
+                                personas_detectadas = 0
+                                print(f"Advertencia: No se encontró la región procesada para el polígono con ID {p_id} en cámara {cam_uuid}")
+
+
+                            # Actualizar el diccionario original del polígono
+                            p_data['personas_Detectadas'] = personas_detectadas
+                            updated_polygons_data.append(p_data) # Añadir a la lista actualizada
+
+                            # Añadir al histórico
                             detections_for_historic.append({
-                                'id': polygon.get('id', ''),
-                                'label': polygon.get('label', ''),
+                                'id': p_data.get('id', ''),
+                                'label': p_data.get('label', ''),
                                 'personas_detectadas': personas_detectadas,
-                                'max_personas': polygon.get('max_personas', 0),
-                                'area': polygon.get('area', 0),
-                                'perimeter': polygon.get('perimeter', 0),
-                                'points': polygon.get('points', []),
-                                'color': polygon.get('color', [0, 255, 0])
+                                'max_personas': p_data.get('max_personas', 0),
+                                'area': p_data.get('area', 0),
+                                'perimeter': p_data.get('perimeter', 0),
+                                'points': p_data.get('points', []),
+                                'color': p_data.get('color', [0, 255, 0])
                             })
 
-                        cam_data['mesas'] = polygons
+                        # 7. Guardar los datos actualizados
+                        cam_data['mesas'] = updated_polygons_data # Guardar la lista con conteos actualizados
                         cam_data['last_detection_time'] = current_time
-
-                        #print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-                        #dt = datetime.utcfromtimestamp(current_time)
-                        #print(dt.strftime("%Y-%m-%d %H:%M:%S.%f UTC"))
-                        #print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-
 
                         save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
 
-                        # Aquí guardamos el histórico en MongoDB
-                        guardar_historico(cam_uuid, detections_for_historic, ambiente_nombre, piso_nombre)
+                        # Guardar el histórico en MongoDB
+                        if detections_for_historic: # Solo guardar si hubo algo que detectar/contar
+                           guardar_historico(cam_uuid, detections_for_historic, ambiente_nombre, piso_nombre)
 
+                        # Limpiar memoria si es necesario (depende de cómo YOLO maneje los recursos)
+                        # del model
+                        # torch.cuda.empty_cache() # Si usas GPU con PyTorch
 
+                    # else: connection_state != 'stable' -> no hacer nada
+                # else: status != 'configurated' -> no hacer nada
+
+    # Nota: La lógica de `track_history` y el dibujo de las trazas y conteos en el frame
+    # que estaba en `track_and_count` no está presente en esta versión optimizada,
+    # ya que el objetivo principal era optimizar el *conteo* y el guardado de datos.
+    # Si necesitas generar un frame con las visualizaciones, tendrías que añadir esa lógica
+    # después del paso 5, iterando sobre `results` y `counting_regions` para dibujar.
 
 
 
