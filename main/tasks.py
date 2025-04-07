@@ -1,6 +1,7 @@
 # tasks.py
-import datetime
+from datetime import datetime, timedelta, timezone
 from celery import shared_task
+import pytz
 from .firebase_helpers import get_camera_by_uuid, save_camera_data
 import time
 from firebase_admin import db
@@ -46,12 +47,17 @@ def test_camera_connection(ip_url, username=None, password=None, protocol="http"
 
 @shared_task
 def run_detection_for_configured_cameras():
+
+
     ambientes_ref = db.reference('/ambientes')
     ambientes_data = ambientes_ref.get()
     if not ambientes_data:
         return
 
-    current_time = datetime.datetime.utcnow().timestamp()
+    #current_time = datetime.now(pytz.timezone('America/Lima')).timestamp()
+    #current_time = datetime.utcnow().timestamp()
+    #current_time = datetime.now(timezone.utc).timestamp()
+    current_time = datetime.now(pytz.utc).timestamp()
 
     for ambiente_nombre, ambiente_data in ambientes_data.items():
         for piso_nombre, piso_data in (ambiente_data.get('piso', {}) or {}).items():
@@ -62,7 +68,9 @@ def run_detection_for_configured_cameras():
                         detection_interval = cam_data.get('detection_interval', 5)
                         last_detection_time = cam_data.get('last_detection_time', 0)
                         if current_time - last_detection_time < detection_interval:
+                            #print("No es el momento de detectar")
                             continue
+                        #print("es el momento de detectar")
 
                         ip_url = cam_data['ip_url']
                         username = cam_data.get('username')
@@ -110,6 +118,13 @@ def run_detection_for_configured_cameras():
 
                         cam_data['mesas'] = polygons
                         cam_data['last_detection_time'] = current_time
+
+                        #print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+                        #dt = datetime.utcfromtimestamp(current_time)
+                        #print(dt.strftime("%Y-%m-%d %H:%M:%S.%f UTC"))
+                        #print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+
+
                         save_camera_data(ambiente_nombre, piso_nombre, cam_uuid, cam_data)
 
                         # Aquí guardamos el histórico en MongoDB

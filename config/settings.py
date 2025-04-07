@@ -142,7 +142,6 @@ USE_I18N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
@@ -156,6 +155,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Celery settings
 CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Use the appropriate Redis URL
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
+
+CELERY_ENABLE_UTC = True  # <-- clave para tu problema
+CELERY_TIMEZONE = 'America/Lima'  # <-- clave para tu problema
 
 
 # settings.py
