@@ -1,0 +1,11 @@
+Iniciar Programa en WSL//LINUX
+
+celery -A config beat --loglevel=info
+celery -A config worker --loglevel=info
+sudo systemctl start mongod
+
+//fastapi
+uvicorn main:app --reload --port 8001
+
+//django
+python manage.py runserver
