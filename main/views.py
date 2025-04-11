@@ -52,6 +52,10 @@ import colorsys  # Importante: Añadimos colorsys
 
 
 
+
+
+
+
 def role_required(allowed_roles=[]):
     """
     Decorador para vistas que verifica si el usuario tiene uno de los roles permitidos.
@@ -69,6 +73,11 @@ def role_required(allowed_roles=[]):
     return decorator
 
 
+@login_required
+def estadisticas_view(request):
+    """Renderiza la página de estadísticas."""
+    context = {} # Puedes pasar contexto inicial si fuera necesario
+    return render(request, 'estadisticas.html', context)
 
 # views.py
 

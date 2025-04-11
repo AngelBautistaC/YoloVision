@@ -1,0 +1,588 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}Estadísticas de Ocupación{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-filter me-2"></i>Filtros Globales</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-lg-3 col-md-6">
+                            <label for="from_date" class="form-label form-label-sm">Desde:</label>
+                            <input type="date" id="from_date" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-lg-3 col-md-6">
+                            <label for="to_date" class="form-label form-label-sm">Hasta:</label>
+                            <input type="date" id="to_date" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label for="filter_ambiente" class="form-label form-label-sm">Ambiente:</label>
+                            <select id="filter_ambiente" class="form-select form-select-sm">
+                                <option value="" selected>Todos los Ambientes</option>
+                                </select>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label for="filter_piso" class="form-label form-label-sm">Piso:</label>
+                            <select id="filter_piso" class="form-select form-select-sm">
+                                <option value="" selected>Todos los Pisos</option>
+                                </select>
+                        </div>
+                        <div class="col-lg-2 col-md-12">
+                            <button id="update-all-btn" class="btn btn-primary w-100 btn-sm">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Actualizar Todo
+                            </button>
+                        </div>
+                    </div>
+                     <div id="global-error-indicator" class="alert alert-danger mt-3" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-7 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center bg-white">
+                    <h5 id="temporal-chart-title" class="mb-0 card-title-sm">Patrón Temporal</h5>
+                    <select id="group_by_time" class="form-select form-select-sm w-auto ms-2">
+                        <option value="hour" selected>Por Hora</option>
+                        <option value="weekday">Por Día Semana</option>
+                        <option value="date">Tendencia Diaria</option>
+                    </select>
+                </div>
+                <div class="card-body">
+                    <div id="temporal-loading" class="chart-loading" style="display: none;">Cargando...</div>
+                    <div id="temporal-error" class="chart-error" style="display: none;"></div>
+                    <div id="temporal-nodata" class="chart-nodata" style="display: none;">No hay datos.</div>
+                    <div id="temporal-chart-container" class="chart-container" style="height: 300px;">
+                        <canvas id="temporal-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-white">
+                     <h5 id="ambiente-chart-title" class="mb-0 card-title-sm">Promedio por Ambiente</h5>
+                 </div>
+                 <div class="card-body">
+                    <div id="ambiente-loading" class="chart-loading" style="display: none;">Cargando...</div>
+                    <div id="ambiente-error" class="chart-error" style="display: none;"></div>
+                    <div id="ambiente-nodata" class="chart-nodata" style="display: none;">No hay datos.</div>
+                    <div id="ambiente-chart-container" class="chart-container" style="height: 300px;">
+                        <canvas id="ambiente-chart"></canvas>
+                    </div>
+                 </div>
+             </div>
+        </div>
+    </div>
+
+    <div class="row">
+         <div class="col-lg-7 mb-4">
+             <div class="card h-100 shadow-sm">
+                 <div class="card-header bg-white">
+                     <h5 id="camera-rank-title" class="mb-0 card-title-sm">Top 10 Cámaras más Activas</h5>
+                 </div>
+                 <div class="card-body">
+                     <div id="camera-loading" class="chart-loading" style="display: none;">Cargando...</div>
+                     <div id="camera-error" class="chart-error" style="display: none;"></div>
+                     <div id="camera-nodata" class="chart-nodata" style="display: none;">No hay datos.</div>
+                     <div id="camera-rank-container" style="max-height: 350px; overflow-y: auto;">
+                         <table class="table table-sm table-hover" id="camera-rank-table">
+                             <thead>
+                                 <tr>
+                                     <th>#</th>
+                                     <th>Cámara</th>
+                                     <th>Ambiente</th>
+                                     <th>Piso</th>
+                                     <th>Promedio</th>
+                                 </tr>
+                             </thead>
+                             <tbody>
+                                 </tbody>
+                         </table>
+                     </div>
+                     <small class="text-muted d-block mt-2">Haz clic en una fila para ver el detalle por zona.</small>
+                 </div>
+             </div>
+         </div>
+
+         <div class="col-lg-5 mb-4">
+             <div class="card h-100 shadow-sm">
+                 <div class="card-header bg-white">
+                     <h5 id="zone-chart-title" class="mb-0 card-title-sm">Promedio por Zona/Mesa</h5>
+                 </div>
+                 <div class="card-body">
+                     <div id="zone-loading" class="chart-loading" style="display: none;">Cargando...</div>
+                     <div id="zone-error" class="chart-error" style="display: none;"></div>
+                     <div id="zone-nodata" class="chart-nodata" style="display: block;">Seleccione una cámara de la tabla para ver el detalle.</div>
+                     <div id="zone-chart-container" class="chart-container" style="height: 350px; display: none;">
+                         <canvas id="zone-chart"></canvas>
+                     </div>
+                 </div>
+             </div>
+         </div>
+     </div>
+
+</div> {# End container-fluid #}
+
+{# Estilos CSS específicos para esta página (pueden ir en un archivo CSS separado) #}
+<style>
+    .card-title-sm { font-size: 0.95rem; font-weight: 500; }
+    .form-label-sm { font-size: 0.8rem; margin-bottom: 0.2rem; }
+    .chart-container { position: relative; width: 100%; }
+    .chart-loading, .chart-error, .chart-nodata { text-align: center; padding: 20px; color: #6c757d; font-style: italic; }
+    #camera-rank-table th, #camera-rank-table td { font-size: 0.8rem; padding: 0.4rem; vertical-align: middle; }
+    #camera-rank-table tbody tr { cursor: pointer; }
+    #camera-rank-table tbody tr:hover { background-color: #f0f0f0; }
+    .table > :not(caption) > * > * { border-bottom-width: 0; } /* Remove default table borders */
+    thead th { border-bottom: 1px solid #dee2e6 !important; } /* Add border only below header */
+</style>
+{% endblock %}
+
+
+{% block extra_js %}
+{# Incluir Chart.js #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Referencias a Elementos del DOM ---
+    const fromDateInput = document.getElementById('from_date');
+    const toDateInput = document.getElementById('to_date');
+    const ambienteFilterSelect = document.getElementById('filter_ambiente');
+    const pisoFilterSelect = document.getElementById('filter_piso');
+    const updateAllButton = document.getElementById('update-all-btn');
+    const globalErrorIndicator = document.getElementById('global-error-indicator');
+
+    // Sección 1 (Temporal)
+    const timeGroupBySelect = document.getElementById('group_by_time');
+    const temporalChartCanvas = document.getElementById('temporal-chart');
+    const temporalChartTitle = document.getElementById('temporal-chart-title');
+    const temporalLoading = document.getElementById('temporal-loading');
+    const temporalError = document.getElementById('temporal-error');
+    const temporalNoData = document.getElementById('temporal-nodata');
+    const temporalChartContainer = document.getElementById('temporal-chart-container');
+    let temporalChart = null;
+
+    // Sección 2 (Ambiente)
+    const ambienteChartCanvas = document.getElementById('ambiente-chart');
+    const ambienteChartTitle = document.getElementById('ambiente-chart-title');
+    const ambienteLoading = document.getElementById('ambiente-loading');
+    const ambienteError = document.getElementById('ambiente-error');
+    const ambienteNoData = document.getElementById('ambiente-nodata');
+    const ambienteChartContainer = document.getElementById('ambiente-chart-container');
+    let ambienteChart = null;
+
+    // Sección 3 (Cámaras)
+    const cameraRankTableBody = document.querySelector('#camera-rank-table tbody');
+    const cameraRankTitle = document.getElementById('camera-rank-title');
+    const cameraLoading = document.getElementById('camera-loading');
+    const cameraError = document.getElementById('camera-error');
+    const cameraNoData = document.getElementById('camera-nodata');
+    const cameraRankContainer = document.getElementById('camera-rank-container');
+
+    // Sección 4 (Zonas)
+    const zoneChartCanvas = document.getElementById('zone-chart');
+    const zoneChartTitle = document.getElementById('zone-chart-title');
+    const zoneLoading = document.getElementById('zone-loading');
+    const zoneError = document.getElementById('zone-error');
+    const zoneNoData = document.getElementById('zone-nodata');
+    const zoneChartContainer = document.getElementById('zone-chart-container');
+    let zoneChart = null;
+    let selectedCameraForZone = null; // Guarda la cámara seleccionada para el detalle
+
+    // --- Configuración ---
+    const API_BASE_URL = 'http://127.0.0.1:8001'; // AJUSTAR SI ES NECESARIO
+
+    // --- Funciones Auxiliares ---
+    const showElement = (el, show) => { el.style.display = show ? 'block' : 'none'; };
+    const showChartContainer = (el, show) => { el.style.display = show ? 'block' : 'none'; };
+    const setLoading = (loadingEl, errorEl, nodataEl, containerEl, isLoading) => {
+        showElement(loadingEl, isLoading);
+        if (isLoading) { // Ocultar otros indicadores al cargar
+            showElement(errorEl, false);
+            showElement(nodataEl, false);
+            showChartContainer(containerEl, false); // Ocultar gráfico/tabla al cargar
+        }
+    };
+    const setError = (errorEl, nodataEl, loadingEl, containerEl, message) => {
+        errorEl.textContent = message;
+        showElement(errorEl, !!message);
+        showElement(nodataEl, false);
+        showElement(loadingEl, false);
+        showChartContainer(containerEl, false); // Ocultar gráfico/tabla en error
+    };
+    const setNoData = (nodataEl, errorEl, loadingEl, containerEl, show) => {
+        showElement(nodataEl, show);
+        if(show) { // Ocultar otros indicadores si no hay datos
+             showElement(errorEl, false);
+             showElement(loadingEl, false);
+             showChartContainer(containerEl, false);
+        } else {
+             showChartContainer(containerEl, true); // Mostrar contenedor si hay datos
+        }
+    };
+    const clearGlobalError = () => { showElement(globalErrorIndicator, false); globalErrorIndicator.textContent = ''; };
+    const setGlobalError = (message) => { showElement(globalErrorIndicator, true); globalErrorIndicator.textContent = message; };
+
+    const getWeekdayName = (weekdayNumber) => ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][weekdayNumber - 1] || `Día ${weekdayNumber}`;
+
+    const formatDate = (date) => date.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // --- Lógica de Renderizado de Gráficos y Tablas ---
+
+    // Renderiza Gráfico Temporal (Sec 1)
+    const renderTemporalChart = (apiResult) => {
+        const ctx = temporalChartCanvas.getContext('2d');
+        const groupBy = apiResult.filters.group_by;
+        const chartData = apiResult.data;
+
+        setLoading(temporalLoading, temporalError, temporalNoData, temporalChartContainer, false); // Ocultar loading
+
+        if (!chartData || chartData.length === 0) {
+            setNoData(temporalNoData, temporalError, temporalLoading, temporalChartContainer, true);
+            if (temporalChart) { temporalChart.destroy(); temporalChart = null; }
+            return;
+        }
+        setNoData(temporalNoData, temporalError, temporalLoading, temporalChartContainer, false); // Asegurar que no-data está oculto
+
+        let labels = [];
+        let dataPoints = [];
+        let chartType = 'bar';
+        let options = { /* Opciones base de Chart.js */
+            responsive: true, maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, title: { display: true, text: 'Promedio Personas' } }, x: { title: { display: true } } },
+            plugins: { legend: { display: false }, tooltip: { /* callbacks ... */ } }
+        };
+
+        // Adaptar datos y opciones según agrupación
+        chartData.sort((a, b) => { /* Sort logic */
+             if (groupBy === 'hour') return a.hour - b.hour;
+             if (groupBy === 'weekday') return a.weekday - b.weekday;
+             if (groupBy === 'date') return new Date(a.statistic_date) - new Date(b.statistic_date);
+             return 0;
+         });
+
+        chartData.forEach(item => {
+            let avgPersons = item.average_persons ?? 0;
+            if (groupBy === 'hour') { labels.push(`${String(item.hour).padStart(2, '0')}:00`); dataPoints.push(avgPersons); options.scales.x.title.text = 'Hora del Día'; }
+            else if (groupBy === 'weekday') { labels.push(getWeekdayName(item.weekday)); dataPoints.push(avgPersons); options.scales.x.title.text = 'Día de la Semana'; }
+            else if (groupBy === 'date') { labels.push(item.statistic_date); dataPoints.push(avgPersons); chartType = 'line'; options.scales.x.title.text = 'Fecha'; options.scales.x.type = 'category'; }
+        });
+
+        if (temporalChart) temporalChart.destroy(); // Destruir anterior
+
+        temporalChart = new Chart(ctx, {
+            type: chartType,
+            data: {
+                labels: labels,
+                datasets: [{ label: 'Promedio Personas', data: dataPoints, backgroundColor: 'rgba(4, 35, 84, 0.7)', borderColor: 'rgba(4, 35, 84, 1)', borderWidth: 1.5 }]
+            },
+            options: options
+        });
+    };
+
+    // Renderiza Gráfico Ambiente (Sec 2)
+    const renderAmbienteChart = (apiResult) => {
+        const ctx = ambienteChartCanvas.getContext('2d');
+        const chartData = apiResult.data;
+
+        setLoading(ambienteLoading, ambienteError, ambienteNoData, ambienteChartContainer, false);
+
+        if (!chartData || chartData.length === 0) {
+            setNoData(ambienteNoData, ambienteError, ambienteLoading, ambienteChartContainer, true);
+            if (ambienteChart) { ambienteChart.destroy(); ambienteChart = null; }
+            return;
+        }
+        setNoData(ambienteNoData, ambienteError, ambienteLoading, ambienteChartContainer, false);
+
+        chartData.sort((a, b) => a.ambiente.localeCompare(b.ambiente)); // Ordenar por nombre
+
+        const labels = chartData.map(item => item.ambiente);
+        const dataPoints = chartData.map(item => item.average_persons ?? 0);
+
+        if (ambienteChart) ambienteChart.destroy();
+
+        ambienteChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'Promedio Personas', data: dataPoints, backgroundColor: 'rgba(0, 123, 255, 0.7)', borderColor: 'rgba(0, 123, 255, 1)', borderWidth: 1.5, borderRadius: 4 }]
+            },
+            options: { /* Opciones Chart.js */
+                 responsive: true, maintainAspectRatio: false, indexAxis: 'y', // Barras Horizontales
+                 scales: { y: { beginAtZero: true, ticks: { font: { size: 9 } } }, x: { title: { display: true, text: 'Promedio Personas' } } },
+                 plugins: { legend: { display: false }, tooltip: { /* callbacks ... */ } }
+             }
+        });
+    };
+
+     // Renderiza Tabla Cámaras (Sec 3)
+     const renderCameraTable = (apiResult) => {
+         const tableData = apiResult.data;
+         setLoading(cameraLoading, cameraError, cameraNoData, cameraRankContainer, false);
+
+         // Limpiar tabla anterior y listeners
+         cameraRankTableBody.innerHTML = '';
+
+         if (!tableData || tableData.length === 0) {
+             setNoData(cameraNoData, cameraError, cameraLoading, cameraRankContainer, true);
+             return;
+         }
+         setNoData(cameraNoData, cameraError, cameraLoading, cameraRankContainer, false);
+
+         tableData.forEach((item, index) => {
+             const row = cameraRankTableBody.insertRow();
+             row.setAttribute('data-camera-uuid', item.camera_uuid);
+             row.setAttribute('data-camera-name', item.camera_uuid); // Usar UUID como nombre si no hay otro
+             row.style.cursor = 'pointer'; // Indicar que es clickeable
+
+             row.insertCell().textContent = index + 1; // Rank
+             row.insertCell().textContent = item.camera_uuid; // O nombre si lo tuvieras
+             row.insertCell().textContent = item.ambiente ?? 'N/A';
+             row.insertCell().textContent = item.piso ?? 'N/A';
+             row.insertCell().textContent = (item.average_persons ?? 0).toFixed(1);
+
+             // Añadir listener para actualizar sección 4
+             row.addEventListener('click', () => {
+                 // Resaltar fila seleccionada (opcional)
+                 document.querySelectorAll('#camera-rank-table tbody tr').forEach(tr => tr.classList.remove('table-active'));
+                 row.classList.add('table-active');
+                 selectedCameraForZone = { uuid: item.camera_uuid, name: item.camera_uuid }; // Guardar cámara seleccionada
+                 updateZoneSection(item.camera_uuid); // Llamar a actualizar detalle zona
+             });
+         });
+     };
+
+     // Renderiza Gráfico Zonas (Sec 4)
+     const renderZoneChart = (apiResult) => {
+         const ctx = zoneChartCanvas.getContext('2d');
+         const chartData = apiResult.data;
+
+         setLoading(zoneLoading, zoneError, zoneNoData, zoneChartContainer, false);
+
+         if (!chartData || chartData.length === 0) {
+             setNoData(zoneNoData, zoneError, zoneLoading, zoneChartContainer, true);
+             zoneNoData.textContent = `No hay datos de zonas para la cámara seleccionada (${selectedCameraForZone?.name ?? ''}).`; // Mensaje específico
+             if (zoneChart) { zoneChart.destroy(); zoneChart = null; }
+             return;
+         }
+         setNoData(zoneNoData, zoneError, zoneLoading, zoneChartContainer, false); // Ocultar 'Seleccione cámara...'
+
+        // chartData.sort((a, b) => a.zone_label.localeCompare(b.zone_label)); // Ordenar por nombre de zona
+                // --- ORDENAMIENTO MÁS ROBUSTO ---
+        chartData.sort((a, b) => {
+            // Tratar null/undefined como string vacío para la comparación
+            const labelA = a._id || ''; // Usar _id
+            const labelB = b._id || ''; // Usar _id
+            return labelA.localeCompare(labelB);
+        });
+        // --- FIN ORDENAMIENTO MÁS ROBUSTO ---
+
+         const labels = chartData.map(item => item._id); // Usar _id
+         const dataPoints = chartData.map(item => item.average_persons ?? 0);
+
+         if (zoneChart) zoneChart.destroy();
+
+         zoneChart = new Chart(ctx, {
+             type: 'bar',
+             data: {
+                 labels: labels,
+                 datasets: [{ label: 'Promedio Personas', data: dataPoints, backgroundColor: 'rgba(40, 167, 69, 0.7)', borderColor: 'rgba(40, 167, 69, 1)', borderWidth: 1.5, borderRadius: 4 }]
+             },
+             options: { /* Opciones Chart.js */
+                 responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                 scales: { y: { beginAtZero: true, ticks: { font: { size: 9 } } }, x: { title: { display: true, text: 'Promedio Personas' } } },
+                 plugins: { legend: { display: false }, tooltip: { /* callbacks ... */ } }
+             }
+         });
+     };
+
+
+    // --- Lógica de Obtención de Datos y Actualización ---
+
+    // Obtener y poblar filtros de Ambiente y Piso
+    const populateLocationFilters = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/distinct_locations`);
+            if (!response.ok) throw new Error(`Error ${response.status}`);
+            const data = await response.json();
+
+            // Limpiar opciones existentes (excepto la primera "Todos...")
+            ambienteFilterSelect.options.length = 1;
+            pisoFilterSelect.options.length = 1;
+
+            data.ambientes.forEach(ambiente => {
+                const option = new Option(ambiente, ambiente);
+                ambienteFilterSelect.add(option);
+            });
+            data.pisos.forEach(piso => {
+                const option = new Option(piso, piso);
+                pisoFilterSelect.add(option);
+            });
+        } catch (error) {
+            console.error("Error populating location filters:", error);
+            setGlobalError(`No se pudieron cargar los filtros de ubicación: ${error.message}`);
+        }
+    };
+
+    // Función principal para actualizar todas las secciones (excepto zona)
+    const updateAllSections = async () => {
+        clearGlobalError();
+        const fromDate = fromDateInput.value;
+        const toDate = toDateInput.value;
+        const ambiente = ambienteFilterSelect.value;
+        const piso = pisoFilterSelect.value;
+        const timeGroup = timeGroupBySelect.value;
+
+        // Validación simple
+        if (fromDate && toDate && fromDate > toDate) {
+            setGlobalError('La fecha "Desde" no puede ser posterior a la fecha "Hasta".');
+            return;
+        }
+        if (timeGroup === 'date' && (!fromDate || !toDate)) {
+             setError(temporalError, temporalNoData, temporalLoading, temporalChartContainer, 'Seleccione Desde/Hasta para Tendencia Diaria.');
+        } else {
+             // Limpiar error si la validación pasa
+             setError(temporalError, temporalNoData, temporalLoading, temporalChartContainer, '');
+        }
+
+
+        // Resetear sección de zonas si se actualizan filtros globales
+        setNoData(zoneNoData, zoneError, zoneLoading, zoneChartContainer, true); // Mostrar 'Seleccione cámara...'
+        zoneNoData.textContent = 'Seleccione una cámara de la tabla para ver el detalle.';
+        zoneChartTitle.textContent = 'Promedio por Zona/Mesa';
+        if (zoneChart) { zoneChart.destroy(); zoneChart = null; }
+        selectedCameraForZone = null;
+        document.querySelectorAll('#camera-rank-table tbody tr').forEach(tr => tr.classList.remove('table-active'));
+
+
+        // Preparar llamadas API (podrían ejecutarse en paralelo)
+        const fetchTemporal = fetch(`${API_BASE_URL}/api/stats/average?group_by=${timeGroup}${fromDate ? `&from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}${ambiente ? `&ambiente=${ambiente}` : ''}${piso ? `&piso=${piso}` : ''}`)
+            .then(res => res.ok ? res.json() : res.text().then(text => { throw new Error(`Temporal: ${res.status} ${text}`) }));
+
+        const fetchAmbiente = fetch(`${API_BASE_URL}/api/stats/average_by_location?group_by=ambiente${fromDate ? `&from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}${piso ? `&piso=${piso}` : ''}`)
+            .then(res => res.ok ? res.json() : res.text().then(text => { throw new Error(`Ambiente: ${res.status} ${text}`) }));
+
+        const fetchCamera = fetch(`${API_BASE_URL}/api/stats/average_by_location?group_by=camera_uuid&limit=10${fromDate ? `&from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}${ambiente ? `&ambiente=${ambiente}` : ''}${piso ? `&piso=${piso}` : ''}`)
+             .then(res => res.ok ? res.json() : res.text().then(text => { throw new Error(`Camera Rank: ${res.status} ${text}`) }));
+
+        // Mostrar indicadores de carga
+        setLoading(temporalLoading, temporalError, temporalNoData, temporalChartContainer, true);
+        setLoading(ambienteLoading, ambienteError, ambienteNoData, ambienteChartContainer, true);
+        setLoading(cameraLoading, cameraError, cameraNoData, cameraRankContainer, true);
+
+        try {
+            // Esperar todas las llamadas
+            const [temporalResult, ambienteResult, cameraResult] = await Promise.all([fetchTemporal, fetchAmbiente, fetchCamera]);
+
+            // Renderizar secciones con los resultados
+            renderTemporalChart(temporalResult);
+            renderAmbienteChart(ambienteResult);
+            renderCameraTable(cameraResult);
+
+        } catch (error) {
+            console.error("Error updating sections:", error);
+            setGlobalError(`Error al actualizar: ${error.message}`);
+            // Limpiar indicadores de las secciones que fallaron (o todas)
+             setError(temporalError, temporalNoData, temporalLoading, temporalChartContainer, 'Error al cargar');
+             setError(ambienteError, ambienteNoData, ambienteLoading, ambienteChartContainer, 'Error al cargar');
+             setError(cameraError, cameraNoData, cameraLoading, cameraRankContainer, 'Error al cargar');
+        } finally {
+             // Asegurarse que los loading se oculten incluso si algo falla antes del render
+             setLoading(temporalLoading, temporalError, temporalNoData, temporalChartContainer, false);
+             setLoading(ambienteLoading, ambienteError, ambienteNoData, ambienteChartContainer, false);
+             setLoading(cameraLoading, cameraError, cameraNoData, cameraRankContainer, false);
+        }
+    };
+
+     // Función para actualizar la sección de zonas/mesas
+     const updateZoneSection = async (cameraUuid) => {
+         if (!cameraUuid) return;
+
+         const fromDate = fromDateInput.value;
+         const toDate = toDateInput.value;
+
+         setLoading(zoneLoading, zoneError, zoneNoData, zoneChartContainer, true);
+         zoneChartTitle.textContent = `Promedio por Zona/Mesa (${selectedCameraForZone?.name ?? cameraUuid})`; // Actualizar título
+
+         const apiUrl = `${API_BASE_URL}/api/stats/average_by_zone?camera_uuid=${cameraUuid}${fromDate ? `&from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}`;
+
+         try {
+             const response = await fetch(apiUrl);
+             if (!response.ok) {
+                 let errorMsg = `Error ${response.status}.`;
+                 try { const errorData = await response.json(); errorMsg = `Error ${response.status}: ${errorData.detail || 'Error desconocido.'}`; } catch(e){}
+                 throw new Error(errorMsg);
+             }
+             const result = await response.json();
+             renderZoneChart(result);
+         } catch (error) {
+             console.error("Error fetching zone data:", error);
+             setError(zoneError, zoneNoData, zoneLoading, zoneChartContainer, `Error al cargar zonas: ${error.message}`);
+         } finally {
+             setLoading(zoneLoading, zoneError, zoneNoData, zoneChartContainer, false);
+         }
+     };
+
+
+    // --- Inicialización ---
+    const initializeDashboard = async () => {
+        // Establecer fechas por defecto
+        const today = new Date();
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
+        if (!fromDateInput.value) fromDateInput.value = formatDate(sevenDaysAgo);
+        if (!toDateInput.value) toDateInput.value = formatDate(today);
+
+        // Poblar filtros y luego actualizar todo
+        await populateLocationFilters();
+        updateAllSections(); // Carga inicial de datos
+
+         // Listener para el selector de agrupación temporal
+         timeGroupBySelect.addEventListener('change', () => {
+             // Solo necesita actualizar la sección 1
+             const fromDate = fromDateInput.value;
+             const toDate = toDateInput.value;
+             const ambiente = ambienteFilterSelect.value;
+             const piso = pisoFilterSelect.value;
+             const timeGroup = timeGroupBySelect.value;
+
+              // Validación
+              setError(temporalError, temporalNoData, temporalLoading, temporalChartContainer, ''); // Clear previous error
+              if (timeGroup === 'date' && (!fromDate || !toDate)) {
+                  setError(temporalError, temporalNoData, temporalLoading, temporalChartContainer, 'Seleccione Desde/Hasta para Tendencia Diaria.');
+                  if (temporalChart) { temporalChart.destroy(); temporalChart = null; } // Clear chart
+                  setNoData(temporalNoData, temporalError, temporalLoading, temporalChartContainer, true); // Show nodata explicitly
+                  return;
+              }
+
+             setLoading(temporalLoading, temporalError, temporalNoData, temporalChartContainer, true);
+             fetch(`${API_BASE_URL}/api/stats/average?group_by=${timeGroup}${fromDate ? `&from_date=${fromDate}` : ''}${toDate ? `&to_date=${toDate}` : ''}${ambiente ? `&ambiente=${ambiente}` : ''}${piso ? `&piso=${piso}` : ''}`)
+                 .then(res => res.ok ? res.json() : res.text().then(text => { throw new Error(`Temporal: ${res.status} ${text}`) }))
+                 .then(renderTemporalChart)
+                 .catch(error => {
+                     console.error("Error updating temporal chart:", error);
+                     setError(temporalError, temporalNoData, temporalLoading, temporalChartContainer, `Error: ${error.message}`);
+                 })
+                 .finally(() => setLoading(temporalLoading, temporalError, temporalNoData, temporalChartContainer, false));
+         });
+
+        // Listener para el botón principal de actualización
+        updateAllButton.addEventListener('click', updateAllSections);
+    };
+
+    initializeDashboard(); // Ejecutar inicialización
+
+});
+</script>
+{% endblock %}
