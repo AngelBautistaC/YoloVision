@@ -166,3 +166,15 @@ CELERY_TIMEZONE = 'America/Lima'  # <-- clave para tu problema
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Store sessions in the database
 SESSION_COOKIE_AGE = 1209600  # Set cookie expiry, e.g., two weeks
 SESSION_SAVE_EVERY_REQUEST = True  # Save session data on every request
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://localhost:6379/1",  # DB 1 para caché
+        "TIMEOUT": 300,  # Valor por defecto de timeout de clave en segundos
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
