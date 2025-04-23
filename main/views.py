@@ -79,8 +79,6 @@ def estadisticas_view(request):
     context = {} # Puedes pasar contexto inicial si fuera necesario
     return render(request, 'estadisticas.html', context)
 
-# views.py
-
 def access_denied(request):
     return render(request, 'access_denied.html')
 
@@ -712,7 +710,8 @@ def iniciar_tracking(request):
             updated_data['status'] = 'configurated'
 
             ref.set(updated_data)
-            create_log_entry(camera_uuid, 'configurated')
+            create_log_entry(request, 'Configuración de tracking', f'Configuración completada para cámara UUID: {camera_uuid}')
+
 
             return JsonResponse({'success': True, 'camera_uuid': camera_uuid})
         except Exception as e:
@@ -1280,6 +1279,7 @@ def obtener_datos_monitoreo():
                                                 "piso": piso_nombre,
                                                 "camara": cam_label,
                                                 "mesa_id": mesa.get("id", "N/A"),
+                                                "mesa_label": mesa.get("label", "Mesa"),
                                                 "max_personas": max_personas,
                                                 "personas_detectadas": personas_detectadas,
                                                 "asientos_disponibles": asientos_disponibles,

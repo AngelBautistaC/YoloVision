@@ -168,11 +168,9 @@
                 </li>
                 {% endif %}
                 <li class="{% if request.resolver_match.url_name == 'estadisticas' %}active{% endif %}">
-                    <a href="{% url 'estadisticas' %}"><i class="bi bi-graph-up"></i> Estadísticas</a> {# Usar {% url %} y un ícono #}
+                    <a href="{% url 'estadisticas' %}">Estadísticas</a> {# Usar {% url %} y un ícono #}
                 </li>
-                <li class="{% if request.path == '/ayuda/' %}active{% endif %}">
-                    <a href="/ayuda"><i class="active"></i> Ayuda</a>
-                </li>
+
                 <li class="{% if request.path == '/logout/' %}active{% endif %}">
                     <a href="/logout/"><i class="active"></i> Cerrar Sesión</a>
                 </li>

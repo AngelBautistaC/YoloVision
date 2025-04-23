@@ -7,7 +7,7 @@ import collections
 from pymongo import MongoClient
 from django.conf import settings
 from datetime import datetime
-
+import pytz
 
 
 def expand_polygon(points, distance_meters, pixels_per_meter):
@@ -76,7 +76,7 @@ def track_and_count(frame, model, track_history, counting_regions):
 # -------- MongoDB Histórico de Detecciones -------- #
 from pymongo import MongoClient
 from django.conf import settings
-from datetime import datetime
+import datetime
 from firebase_admin import db
 
 def obtener_coleccion_historico():
@@ -84,14 +84,20 @@ def obtener_coleccion_historico():
     db = cliente['logs_db']
     return db['historico_detecciones']
 
-def guardar_historico(camera_uuid, detections, ambiente, piso):
+def guardar_historico(camera_uuid, detections, ambiente, piso,nombre_camara):
     historico_detecciones = obtener_coleccion_historico()
+    
+    # Crear zona horaria UTC-5
+    # lima_tz = pytz.timezone("America/Lima")  # Alternativamente, "Etc/GMT+5"
+    # local_time = datetime.datetime.now(lima_tz)
+    #print(local_time)
+    fake_utc = datetime.datetime.utcnow() - datetime.timedelta(hours=5)
     documento = {
+        "nombre_camara": nombre_camara,
         "camera_uuid": camera_uuid,
-        "ambiente": ambiente,  # nuevo campo
-        "piso": piso,          # nuevo campo
-        "timestamp": datetime.utcnow(),
+        "ambiente": ambiente,
+        "piso": piso,
+        "timestamp": fake_utc,
         "detections": detections
     }
     historico_detecciones.insert_one(documento)
-

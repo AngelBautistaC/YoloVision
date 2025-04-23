@@ -69,7 +69,7 @@ class AmbienteStat(BaseModel):
 
 class CameraStat(BaseModel):
     camera_uuid: str
-    # Podríamos añadir un campo 'nombre_camara' si lo obtenemos de alguna forma (ej. $lookup o si está en el doc)
+    nombre_camara: Optional[str]  # <-- Añadir aquí
     ambiente: str
     piso: str
     average_persons: float

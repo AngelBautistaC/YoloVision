@@ -69,6 +69,7 @@ def run_detection_for_configured_cameras():
                         if current_time - last_detection_time < detection_interval:
                             continue
 
+                        nombre_camara=cam_data.get('label')            
                         ip_url = cam_data['ip_url']
                         username = cam_data.get('username')
                         password = cam_data.get('password')
@@ -185,7 +186,7 @@ def run_detection_for_configured_cameras():
 
                         # Guardar el histórico en MongoDB
                         if detections_for_historic: # Solo guardar si hubo algo que detectar/contar
-                           guardar_historico(cam_uuid, detections_for_historic, ambiente_nombre, piso_nombre)
+                           guardar_historico(cam_uuid, detections_for_historic, ambiente_nombre, piso_nombre,nombre_camara)
 
                         # Limpiar memoria si es necesario (depende de cómo YOLO maneje los recursos)
                         # del model

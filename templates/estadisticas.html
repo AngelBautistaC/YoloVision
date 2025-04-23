@@ -326,42 +326,39 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     };
 
-     // Renderiza Tabla Cámaras (Sec 3)
-     const renderCameraTable = (apiResult) => {
-         const tableData = apiResult.data;
-         setLoading(cameraLoading, cameraError, cameraNoData, cameraRankContainer, false);
+// Renderiza Tabla Cámaras (Sec 3)
+const renderCameraTable = (apiResult) => {
+    const tableData = apiResult.data;
+    setLoading(cameraLoading, cameraError, cameraNoData, cameraRankContainer, false);
 
-         // Limpiar tabla anterior y listeners
-         cameraRankTableBody.innerHTML = '';
+    cameraRankTableBody.innerHTML = '';
 
-         if (!tableData || tableData.length === 0) {
-             setNoData(cameraNoData, cameraError, cameraLoading, cameraRankContainer, true);
-             return;
-         }
-         setNoData(cameraNoData, cameraError, cameraLoading, cameraRankContainer, false);
+    if (!tableData || tableData.length === 0) {
+        setNoData(cameraNoData, cameraError, cameraLoading, cameraRankContainer, true);
+        return;
+    }
+    setNoData(cameraNoData, cameraError, cameraLoading, cameraRankContainer, false);
 
-         tableData.forEach((item, index) => {
-             const row = cameraRankTableBody.insertRow();
-             row.setAttribute('data-camera-uuid', item.camera_uuid);
-             row.setAttribute('data-camera-name', item.camera_uuid); // Usar UUID como nombre si no hay otro
-             row.style.cursor = 'pointer'; // Indicar que es clickeable
+    tableData.forEach((item, index) => {
+        const row = cameraRankTableBody.insertRow();
+        row.setAttribute('data-camera-uuid', item.camera_uuid);
+        row.setAttribute('data-camera-name', item.nombre_camara || item.camera_uuid);
+        row.style.cursor = 'pointer';
 
-             row.insertCell().textContent = index + 1; // Rank
-             row.insertCell().textContent = item.camera_uuid; // O nombre si lo tuvieras
-             row.insertCell().textContent = item.ambiente ?? 'N/A';
-             row.insertCell().textContent = item.piso ?? 'N/A';
-             row.insertCell().textContent = (item.average_persons ?? 0).toFixed(1);
+        row.insertCell().textContent = index + 1;
+        row.insertCell().textContent = item.nombre_camara || item.camera_uuid; // Cambio aplicado aquí
+        row.insertCell().textContent = item.ambiente ?? 'N/A';
+        row.insertCell().textContent = item.piso ?? 'N/A';
+        row.insertCell().textContent = (item.average_persons ?? 0).toFixed(1);
 
-             // Añadir listener para actualizar sección 4
-             row.addEventListener('click', () => {
-                 // Resaltar fila seleccionada (opcional)
-                 document.querySelectorAll('#camera-rank-table tbody tr').forEach(tr => tr.classList.remove('table-active'));
-                 row.classList.add('table-active');
-                 selectedCameraForZone = { uuid: item.camera_uuid, name: item.camera_uuid }; // Guardar cámara seleccionada
-                 updateZoneSection(item.camera_uuid); // Llamar a actualizar detalle zona
-             });
-         });
-     };
+        row.addEventListener('click', () => {
+            document.querySelectorAll('#camera-rank-table tbody tr').forEach(tr => tr.classList.remove('table-active'));
+            row.classList.add('table-active');
+            selectedCameraForZone = { uuid: item.camera_uuid, name: item.nombre_camara || item.camera_uuid };
+            updateZoneSection(item.camera_uuid);
+        });
+    });
+};
 
      // Renderiza Gráfico Zonas (Sec 4)
      const renderZoneChart = (apiResult) => {

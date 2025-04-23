@@ -106,10 +106,11 @@ def get_average_stats_endpoint( # Renombrado para claridad interna
 # --- NUEVO Endpoint para Agregación por Ubicación ---
 @app.get(
     "/api/stats/average_by_location",
-    # response_model=LocationStatsResponse, # El modelo exacto depende del group_by
+    response_model=LocationStatsResponse,  # <-- asegurado ahora que CameraStat tiene el campo nuevo
     summary="Get Aggregated Occupancy Statistics (by Location)",
     description="Calculates average persons grouped by 'ambiente' or 'camera_uuid', optionally filtered."
 )
+
 async def get_average_by_location_endpoint(
     # Dependencias de Filtros Comunes
     date_filters: Dict = Depends(get_date_filters),
