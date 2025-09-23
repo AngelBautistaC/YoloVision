@@ -77,7 +77,7 @@ def save_camera_data(ambiente_nombre, piso, camera_uuid, camera_data):
     # Guardar los datos de la cámara
     camera_ref.set(camera_data)
 
-    print(f"Cámara guardada correctamente en {ambiente_nombre} - Piso: {piso}")
+    #print(f"Cámara guardada correctamente en {ambiente_nombre} - Piso: {piso}")
 
 
 
@@ -88,7 +88,7 @@ def save_camera_data2(ambiente_nombre, piso, camera_uuid, camera_data):
     # Guardar los datos de la cámara
     camera_ref.set(camera_data)
 
-    print(f"Cámara guardada correctamente en {ambiente_nombre} - Piso: {piso}")
+    #print(f"Cámara guardada correctamente en {ambiente_nombre} - Piso: {piso}")
 
 from firebase_admin import auth, firestore
 

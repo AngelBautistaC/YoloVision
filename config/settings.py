@@ -142,7 +142,6 @@ USE_I18N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
@@ -158,8 +157,24 @@ CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Use the appropriate Redis URL
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 
 
+CELERY_ENABLE_UTC = True  # <-- clave para tu problema
+CELERY_TIMEZONE = 'America/Lima'  # <-- clave para tu problema
+
+
 # settings.py
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Store sessions in the database
 SESSION_COOKIE_AGE = 1209600  # Set cookie expiry, e.g., two weeks
 SESSION_SAVE_EVERY_REQUEST = True  # Save session data on every request
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://localhost:6379/1",  # DB 1 para caché
+        "TIMEOUT": 300,  # Valor por defecto de timeout de clave en segundos
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}

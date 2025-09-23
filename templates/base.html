@@ -1,3 +1,4 @@
+<!-- base.html -->
 <!DOCTYPE html>
 {% load static %}
 {% load bootstrap5 %}
@@ -166,9 +167,10 @@
                     <a href="/admin/logs/"><i class="active"></i> Logging</a>
                 </li>
                 {% endif %}
-                <li class="{% if request.path == '/ayuda/' %}active{% endif %}">
-                    <a href="/ayuda"><i class="active"></i> Ayuda</a>
+                <li class="{% if request.resolver_match.url_name == 'estadisticas' %}active{% endif %}">
+                    <a href="{% url 'estadisticas' %}">Estadísticas</a> {# Usar {% url %} y un ícono #}
                 </li>
+
                 <li class="{% if request.path == '/logout/' %}active{% endif %}">
                     <a href="/logout/"><i class="active"></i> Cerrar Sesión</a>
                 </li>

@@ -50,7 +50,7 @@
                 <label for="detection-interval">Intervalo de detección (1-60 seg):</label>
                 <input type="number" id="detection-interval" class="form-control" min="1" max="60" value="5">
             </div>
-            <button id="start-tracking-btn" class="btn btn-success mt-3">Guardar Polígonos y Iniciar Detección</button>
+            <button id="start-tracking-btn" class="btn btn-success mt-3">Guardar Polígonos e Iniciar Detección</button>
         </div>
     </div>
 </div>
@@ -83,7 +83,12 @@ document.addEventListener('DOMContentLoaded', function() {
         return response.json();
     })
     .then(data => {
-        detections = data.mesas;
+        // Validación crucial agregada aquí:
+        if (data.mesas && Array.isArray(data.mesas)) {
+            detections = data.mesas;
+        } else {
+            detections = [];  // Si no hay datos, se asigna un arreglo vacío
+        }
         const tableBody = document.querySelector('#table-polygons tbody');
         tableBody.innerHTML = '';
 
